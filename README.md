@@ -1,3 +1,12 @@
+---
+title: AI Interview Bot
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # 🚀 AI Interview Evaluation System
 
 An AI-powered interview simulator that evaluates user responses using **local LLM-based scoring, structured feedback, and strict grading logic**.

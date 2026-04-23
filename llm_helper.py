@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import datetime
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
@@ -8,127 +9,139 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 class QuestionEvaluation(BaseModel):
+    """Pydantic model for structured LLM evaluation output."""
     score: int = Field(description="Score out of 10")
     feedback: str = Field(description="Feedback on the answer, including strengths and weaknesses")
-    suggestions: str = Field(description="Suggestions for improvement, such as real-world examples or technical terms to include")
+    suggestions: str = Field(description="Actionable technical suggestions for improvement")
+    difficulty_adjustment: str = Field(description="Recommendation for the next question: 'increase', 'decrease', or 'stay'")
+    follow_up_question: str = Field(description="Contextual follow-up question. Leave empty if moving to a new topic.")
+    is_interview_complete: bool = Field(description="True if enough info is gathered for a final hiring decision.")
+    hiring_decision: str = Field(description="Final verdict: 'Strong Hire', 'Hire', 'Leaning No Hire', or 'No Hire'.")
+    verdict_reasoning: str = Field(description="Comprehensive reasoning for the final verdict.")
 
-# Keywords and patterns that instantly disqualify an answer
-INVALID_ANSWER_PHRASES = [
+# Keywords and patterns that instantly disqualify an answer as gibberish or a dodge
+INVALID_ANSWER_PHRASES = {
     "idk", "i don't know", "i do not know", "dont know", "don't know",
     "no idea", "not sure", "i have no idea", "i don't have an answer",
     "pass", "skip", "n/a", "na", "none", "nothing", "?", "??", "???",
     "i give up", "no answer", "blank", "i am ready", "im ready", "ready",
-]
+}
 
 def is_invalid_answer(answer: str) -> bool:
-    """Check if the answer is gibberish, blank, or a dodge phrase."""
+    """
+    Performs multi-layered validation on the candidate's answer to filter out
+    gibberish, dodging, or low-effort responses. Uses word-boundary checks
+    to avoid false positives with typos.
+    """
+    import re
     stripped = answer.strip().lower()
 
-    # Empty or whitespace only
-    if not stripped:
+    if not stripped or len(stripped) < 4:
         return True
 
-    # Very short answer (less than 5 meaningful chars)
-    if len(stripped) < 5:
-        return True
-
-    # Exact match against known dodge phrases
-    if stripped in INVALID_ANSWER_PHRASES:
-        return True
-
-    # Partial match against dodge phrases
+    # Check for exact matches or whole-word matches of dodge phrases
     for phrase in INVALID_ANSWER_PHRASES:
-        if phrase in stripped:
+        # Use regex to match the phrase as a whole word only
+        pattern = rf"\b{re.escape(phrase)}\b"
+        if re.search(pattern, stripped):
             return True
 
-    # Gibberish detection: if less than 50% of chars are alphabetic/space, it is likely garbage
-    alpha_chars = sum(1 for c in stripped if c.isalpha() or c.isspace())
-    if len(stripped) > 0 and (alpha_chars / len(stripped)) < 0.5:
-        return True
-
-    # Check for repeated characters (e.g. "aaaaaaa", "bbbbb")
-    if len(set(stripped.replace(" ", ""))) < 3 and len(stripped) > 3:
+    # Gibberish check: verify character diversity
+    # Only flag as gibberish if it's very long and has almost no variety
+    if len(stripped) > 20 and len(set(stripped.replace(" ", ""))) < 5:
         return True
 
     return False
 
 
 class InterviewManager:
+    """Manages the interview lifecycle, from question generation to structured evaluation."""
+
     def __init__(self):
-        # Initialize LLM with Ollama
+        # Configure the local LLM via Ollama
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
         self.llm = ChatOllama(model="llama3.2:3b", temperature=0.7, base_url=base_url)
 
-    def generate_questions(self, role: str, num_questions: int = 5, difficulty: str = "Intermediate", resume_text: str = "") -> list[str]:
+    def generate_questions(self, role: str, num_questions: int = 1, difficulty: str = "Intermediate", 
+                           resume_text: str = "", previous_questions: list[str] = None, 
+                           is_behavioral: bool = False) -> list[str]:
+        """Generates contextual and non-repetitive interview questions."""
+        
+        prev_q_str = f" Avoid these previously asked questions: {', '.join(previous_questions)}." if previous_questions else ""
+        q_type = "behavioral (STAR method)" if is_behavioral else "technical"
+        
+        template = (
+            "You are an expert technical interviewer. Generate {num_questions} {difficulty} level {q_type} "
+            "interview questions for a {role} position. "
+        )
+        
         if resume_text.strip():
-            template = "You are an expert technical interviewer. Generate {num_questions} {difficulty} level technical interview questions for a {role} position. Use the candidate's following resume to tailor at least some of the questions to their experience: {resume_text}. Provide only the questions, one per line, without numbering or any other text."
-            input_variables = ["role", "num_questions", "difficulty", "resume_text"]
-            prompt = PromptTemplate(template=template, input_variables=input_variables)
-            chain = prompt | self.llm
-            response = chain.invoke({"role": role, "num_questions": num_questions, "difficulty": difficulty, "resume_text": resume_text})
-        else:
-            template = "You are an expert technical interviewer. Generate {num_questions} {difficulty} level technical interview questions for a {role} position. Provide only the questions, one per line, without numbering or any other text."
-            input_variables = ["role", "num_questions", "difficulty"]
-            prompt = PromptTemplate(template=template, input_variables=input_variables)
-            chain = prompt | self.llm
-            response = chain.invoke({"role": role, "num_questions": num_questions, "difficulty": difficulty})
+            template += "Use the candidate's resume to tailor the questions: {resume_text}. "
+            
+        template += "{prev_q_str} Provide only the questions, one per line, without numbering or extra text."
+
+        prompt = PromptTemplate(
+            template=template, 
+            input_variables=["role", "num_questions", "difficulty", "resume_text", "prev_q_str", "q_type"]
+        )
+        
+        chain = prompt | self.llm
+        response = chain.invoke({
+            "role": role, "num_questions": num_questions, "difficulty": difficulty, 
+            "resume_text": resume_text, "prev_q_str": prev_q_str, "q_type": q_type
+        })
+        
         questions = [q.strip() for q in response.content.split("\n") if q.strip()]
         return questions[:num_questions]
 
-    def evaluate_answer(self, role: str, question: str, answer: str, difficulty: str = "Intermediate", resume_text: str = "") -> dict:
-        # ----------------------------------------------------------------
-        # Layer 1: Python pre-check — catches gibberish/blanks/idk BEFORE
-        # wasting an LLM call. Score is always hard 0, no negotiation.
-        # ----------------------------------------------------------------
+    def evaluate_answer(self, role: str, question: str, answer: str, 
+                        difficulty: str = "Intermediate", resume_text: str = "", 
+                        question_count: int = 1) -> dict:
+        """Evaluates a candidate's answer with technical rigor and contextual awareness."""
+
         if is_invalid_answer(answer):
             return {
                 "score": 0,
-                "feedback": (
-                    "❌ Your answer was not valid. It appears to be blank, gibberish, "
-                    "or a non-answer (e.g. 'idk', random characters, or whitespace). "
-                    "No credit can be awarded for this response."
-                ),
-                "suggestions": (
-                    "Please attempt to answer the question properly. "
-                    "Even a partial answer earns more credit than no answer. "
-                    "Study the topic and try explaining it in your own words."
-                )
+                "feedback": "❌ The response was invalid, blank, or did not attempt to answer the question.",
+                "suggestions": "Please provide a specific and relevant technical answer to receive credit.",
+                "difficulty_adjustment": "decrease",
+                "follow_up_question": "",
+                "is_interview_complete": False,
+                "hiring_decision": "",
+                "verdict_reasoning": ""
             }
 
-        # ----------------------------------------------------------------
-        # Layer 2: LLM evaluation with an ultra-strict scoring prompt
-        # ----------------------------------------------------------------
         parser = JsonOutputParser(pydantic_object=QuestionEvaluation)
+        is_intro = (question_count == 1)
+        phase_name = "Candidate Introduction" if is_intro else "Technical Assessment"
+        
+        template = """You are a senior professional technical interviewer for a {difficulty} level {role} role.
+Current Progress: Question {question_count}
+Phase: {phase_name}
 
-        template = """You are a strict and fair technical interviewer for a {difficulty} level {role} position.
-
-The candidate was asked:
-Question: {question}
-
-The candidate answered:
-Answer: {answer}"""
+Candidate Question: {question}
+Candidate Answer: {answer}"""
         
         if resume_text.strip():
-            template += """\n\nThe candidate's Resume is provided below. You can use it to determine if their answer aligns with their claimed experience.
-Resume: {resume_text}"""
+            template += "\n\nCandidate Resume: {resume_text}"
         
-        template += """\n\nCRITICAL SCORING INSTRUCTIONS. YOU ARE AN UNCOMPROMISING ASSESSOR:
-1. RELEVANCE CHECK: Does the Answer explicitly and technically address the exact Question? If it is a generic statement like "I am ready", "yes", "no", "let's go", or completely changes the subject, you MUST assign a score of 0.
-2. ACCURACY CHECK: If the answer provides factually incorrect technical information for the given role, you MUST assign a 0 or 1.
-3. SCORING RUBRIC:
-   - 0: Completely irrelevant (e.g., "I'm ready"), totally incorrect, or dodges the question.
-   - 1 to 3: Flawed attempt, very poor technical understanding.
-   - 4 to 6: Partially correct but missing major components.
-   - 7 to 8: Good answer, demonstrates clear understanding with minor gaps.
-   - 9 to 10: Outstanding, comprehensive, and accurate response.
+        template += """\n\nSCORING PROTOCOL:
+1. PHASE SPECIFICITY:
+   - If Introduction: Score (0-10) based on communication, professional history, and clarity.
+   - If Technical: Score (0-10) based on technical accuracy, depth, and problem-solving logic.
+2. RELEVANCE: Score 0 if the answer is completely unrelated to the field or specific question.
+3. COMPLETION:
+   - Decide if you have enough information to make a final hiring decision.
+   - **CRITICAL**: An interview MUST last at least 5-8 exchanges to be fair. Never end after just 1 or 2 questions.
+   - If Progress < 5, always set `is_interview_complete` to false.
+4. LOGIC: Never recommend a difficulty 'increase' if the score is below 6/10.
 
-DO NOT BE LENIENT. It is better to give a 0 than to mistakenly award marks for confident nonsense.
-You MUST output ONLY a valid JSON object. Do not add any text outside the JSON.
+Output your evaluation in strict JSON format.
 
 {format_instructions}
 """
         
-        input_vars = ["role", "question", "answer", "difficulty"]
+        input_vars = ["role", "question", "answer", "difficulty", "question_count", "phase_name"]
         if resume_text.strip():
             input_vars.append("resume_text")
             
@@ -139,31 +152,50 @@ You MUST output ONLY a valid JSON object. Do not add any text outside the JSON.
         )
 
         chain = prompt | self.llm.bind(format="json") | parser
+        
         try:
-            invoke_args = {"role": role, "question": question, "answer": answer, "difficulty": difficulty}
-            if resume_text.strip():
-                invoke_args["resume_text"] = resume_text
+            result = chain.invoke({
+                "role": role, "question": question, "answer": answer, 
+                "difficulty": difficulty, "question_count": question_count,
+                "phase_name": phase_name, "resume_text": resume_text
+            })
+            
+            # Default fallback for missing keys
+            defaults = {
+                "score": 0, "feedback": "Evaluation failed.", "suggestions": "N/A",
+                "difficulty_adjustment": "stay", "follow_up_question": "",
+                "is_interview_complete": False, "hiring_decision": "", "verdict_reasoning": ""
+            }
+            for key, val in defaults.items():
+                result.setdefault(key, val)
                 
-            result = chain.invoke(invoke_args)
-            if not isinstance(result, dict):
-                raise ValueError("LLM output is not a dict.")
-
-            # Ensure all required keys exist
-            result.setdefault("score", 0)
-            result.setdefault("feedback", "The evaluation model did not provide feedback.")
-            result.setdefault("suggestions", "Review the topic and try again.")
-
-            # Clamp score to 0-10 range
-            try:
-                result["score"] = max(0, min(10, int(result["score"])))
-            except (ValueError, TypeError):
-                result["score"] = 0
-
             return result
 
-        except Exception:
+        except Exception as e:
             return {
-                "score": 0,
-                "feedback": "The AI evaluator encountered an error processing this response. It has been marked as invalid.",
-                "suggestions": "Try providing a clearly structured and relevant answer next time."
+                "score": 0, "feedback": f"System Error: {str(e)}", "suggestions": "Retrying might help.",
+                "difficulty_adjustment": "stay", "follow_up_question": "",
+                "is_interview_complete": False, "hiring_decision": "", "verdict_reasoning": ""
             }
+
+    def generate_final_summary(self, role: str, evaluations: list[dict]) -> str:
+        """Synthesizes all interview data into a professional performance report."""
+        
+        if not evaluations:
+            return "Interview data unavailable."
+            
+        summary_prompt = f"Review this {role} interview transcript and provide a senior hiring manager's report.\n\n"
+        
+        for i, ev in enumerate(evaluations):
+            summary_prompt += f"Q{i+1}: {ev['question']}\nA: {ev['answer']}\nScore: {ev['evaluation']['score']}/10\n\n"
+            
+        summary_prompt += """
+Format the report with these sections:
+## 📊 Executive Summary
+## ✅ Key Strengths
+## ❌ Technical Gaps & Mistakes
+## 📚 Personal Development Roadmap (3 actionable steps)
+"""
+
+        response = self.llm.invoke(summary_prompt)
+        return response.content

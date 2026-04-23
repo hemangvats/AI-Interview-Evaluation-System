@@ -9,7 +9,7 @@ pinned: false
 
 # 🚀 AI Interview Evaluation System
 
-An AI-powered interview simulator that evaluates user responses using **local LLM-based scoring, structured feedback, and senior-level hiring analytics**.
+An advanced AI-powered interview simulator that provides autonomous, role-based technical assessments using local LLMs. The system features real-time scoring, dynamic difficulty scaling, and comprehensive senior-level performance analytics to help candidates prepare for high-stakes technical interviews.
 
 ---
 

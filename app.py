@@ -369,7 +369,7 @@ else:
     </style>
     <div class="empty-state">
         <h1>Where should we begin?</h1>
-        <p style='color: #888;'>Configure your role and difficulty in the sidebar, then click <b>Start Interview</b> to begin your conversation.</p>
+        <p style='color: #888;'>Configure your role in the sidebar, then click <b>Start Interview</b> to begin your conversation.</p>
     </div>
     """, unsafe_allow_html=True)
     

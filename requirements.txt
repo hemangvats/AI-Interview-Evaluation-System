@@ -4,3 +4,4 @@ langchain-ollama
 python-dotenv
 pydantic
 PyPDF2
+supabase

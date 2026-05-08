@@ -2,21 +2,21 @@ import streamlit as st
 import os
 import json
 import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 from llm_helper import InterviewManager
+from database_helper import DatabaseManager
 
 # --- CONFIG ---
 st.set_page_config(page_title="AI Interview Bot", page_icon="🤖", layout="wide")
 
-HISTORY_DIR = "interview_history"
-os.makedirs(HISTORY_DIR, exist_ok=True)
-
 def save_chat_history():
     if "session_id" in st.session_state and st.session_state.messages:
-        file_path = os.path.join(HISTORY_DIR, f"{st.session_state.session_id}.json")
         data = {
+            "session_id": st.session_state.session_id,
             "role": st.session_state.selected_role,
             "difficulty": st.session_state.selected_difficulty,
-            "timestamp": st.session_state.session_id,
             "messages": st.session_state.messages,
             "evaluations": st.session_state.evaluations,
             "interview_complete": st.session_state.interview_complete,
@@ -27,20 +27,24 @@ def save_chat_history():
             "hiring_decision": st.session_state.get("hiring_decision", ""),
             "verdict_reasoning": st.session_state.get("verdict_reasoning", "")
         }
-        try:
-            with open(file_path, "w") as f:
-                json.dump(data, f)
-        except Exception:
-            pass
+        
+        # 1. Save to Supabase (if connected)
+        if st.session_state.db_manager.is_connected():
+            success = st.session_state.db_manager.save_interview(data)
+            if not success:
+                st.warning("⚠️ Failed to save to Supabase. Your data is not being saved locally.")
 
 st.set_page_config(page_title="AI Interview Prep Bot", page_icon="🤖", layout="wide")
 
 # Initialize Session State
+if "db_manager" not in st.session_state:
+    st.session_state.db_manager = DatabaseManager()
+
 if "interview_manager" not in st.session_state:
     try:
         st.session_state.interview_manager = InterviewManager()
     except Exception as e:
-        st.error("Error initializing LLM. Please ensure Ollama is running and the llama3.2:3b model is pulled.")
+        st.error(f"Error initializing Ollama: {e}. Please ensure Ollama is running and the llama3.2:3b model is pulled.")
         st.stop()
 
 if "questions" not in st.session_state:
@@ -56,9 +60,11 @@ if "interview_complete" not in st.session_state:
 if "selected_role" not in st.session_state:
     st.session_state.selected_role = ""
 if "selected_difficulty" not in st.session_state:
-    st.session_state.selected_difficulty = "Intermediate"
+    st.session_state.selected_difficulty = "Adaptive"
 if "resume_text" not in st.session_state:
     st.session_state.resume_text = ""
+if "interview_phase" not in st.session_state:
+    st.session_state.interview_phase = "technical"
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "final_summary" not in st.session_state:
@@ -87,23 +93,40 @@ with st.sidebar:
         
     st.divider()
     st.header("Recents")
-    history_files = sorted(os.listdir(HISTORY_DIR), reverse=True)
-    if not history_files:
+    
+    recent_interviews = []
+    # Fetch from Supabase (if connected)
+    using_db = st.session_state.db_manager.is_connected()
+    if using_db:
+        db_interviews = st.session_state.db_manager.get_all_interviews()
+        for db_item in db_interviews:
+            sid = db_item["session_id"]
+            recent_interviews.append({
+                "session_id": sid,
+                "role": db_item["role"],
+                "created_at": db_item.get("created_at", sid)[:10]
+            })
+    
+    # Sort by date
+    recent_interviews.sort(key=lambda x: x["session_id"], reverse=True)
+
+    if not recent_interviews:
         st.caption("No recent interviews.")
-    for hf in history_files:
-        if not hf.endswith(".json"): continue
-        try:
-            with open(os.path.join(HISTORY_DIR, hf), "r") as f:
-                hdata = json.load(f)
-            # Create a label with date and role
-            date_str = hdata.get("timestamp", hf.replace(".json", ""))[:8]
-            display_date = f"{date_str[4:6]}/{date_str[6:8]}" if len(date_str) == 8 else date_str
-            btn_label = f"💬 {hdata.get('role', 'Interview')} - {display_date}"
-            
-            col1, col2 = st.columns([6, 1])
-            with col1:
-                if st.button(btn_label, key=f"load_{hf}", use_container_width=True):
-                    st.session_state.session_id = hf.replace(".json", "")
+        
+    for item in recent_interviews:
+        sid = item["session_id"]
+        role = item["role"]
+        date_str = item["created_at"]
+        btn_label = f"📝 {role} - {date_str}"
+        
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            if st.button(btn_label, key=f"load_{sid}", use_container_width=True):
+                # Load full data from Supabase
+                hdata = st.session_state.db_manager.get_interview_by_id(sid)
+                
+                if hdata:
+                    st.session_state.session_id = sid
                     st.session_state.messages = hdata.get("messages", [])
                     st.session_state.evaluations = hdata.get("evaluations", [])
                     st.session_state.interview_complete = hdata.get("interview_complete", False)
@@ -118,29 +141,26 @@ with st.sidebar:
                     st.session_state.interview_active = not st.session_state.interview_complete
                     st.rerun()
                     
-            with col2:
-                if st.button("🗑️", key=f"del_{hf}", use_container_width=True):
-                    try:
-                        os.remove(os.path.join(HISTORY_DIR, hf))
-                        if st.session_state.get("session_id") == hf.replace(".json", ""):
-                            st.session_state.interview_active = False
-                            st.session_state.interview_complete = False
-                            st.session_state.messages = []
-                            st.session_state.evaluations = []
-                            del st.session_state.session_id
-                    except Exception:
-                        pass
-                    st.rerun()
-        except Exception:
-            pass
-
+        with col2:
+            if st.button("🗑️", key=f"del_{sid}", use_container_width=True):
+                using_db = st.session_state.db_manager.is_connected()
+                if using_db:
+                    st.session_state.db_manager.delete_interview(sid)
+                
+                # If we just deleted the active interview, reset it
+                if st.session_state.get("session_id") == sid:
+                    st.session_state.interview_active = False
+                    st.session_state.interview_complete = False
+                    st.session_state.messages = []
+                    del st.session_state.session_id
+                st.rerun()
     st.divider()
     st.header("Interview Settings")
     roles = ["AI Engineer", "Software Developer", "Data Scientist", "Web Developer", "Frontend Developer", "Backend Developer"]
     
     # We use a key so Streamlit tracks it, but we also save to session state when beginning
     selected_role_input = st.selectbox("Select Role", roles)
-    st.info("🎯 **AI-Driven Interview**: The interviewer will autonomously decide when it has enough information to reach a hiring decision.")
+    st.info("🎯 **Autonomous & Adaptive**: The AI will automatically adjust the difficulty based on your performance and decide when the interview is complete.")
     
     st.divider()
     st.subheader("Personalize (Optional)")
@@ -148,7 +168,7 @@ with st.sidebar:
     
     if st.button("Start Interview"):
         st.session_state.selected_role = selected_role_input
-        st.session_state.selected_difficulty = "Intermediate" 
+        st.session_state.selected_difficulty = "Adaptive"
         st.session_state.total_questions = 15 # Safety limit
         st.session_state.hiring_decision = None
         st.session_state.verdict_reasoning = ""
@@ -232,8 +252,11 @@ if st.session_state.interview_active or st.session_state.interview_complete:
                     feedback_msg += f"- **Improvement**: {evaluation['suggestions']}\n"
                     
                     # Difficulty Adjustment UI Logic
-                    diff_levels = ["Beginner", "Intermediate", "Advanced"]
-                    curr_idx = diff_levels.index(st.session_state.selected_difficulty)
+                    diff_levels = ["Beginner", "Intermediate", "Advanced", "Adaptive"]
+                    try:
+                        curr_idx = diff_levels.index(st.session_state.selected_difficulty)
+                    except ValueError:
+                        curr_idx = 1 # Default to Intermediate index
                     adj = evaluation.get("difficulty_adjustment", "stay")
                     
                     if adj == "increase" and curr_idx < 2 and score >= 6:

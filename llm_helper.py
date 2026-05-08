@@ -55,7 +55,7 @@ def is_invalid_answer(answer: str) -> bool:
 
 
 class InterviewManager:
-    """Manages the interview lifecycle, from question generation to structured evaluation."""
+    """Manages the interview lifecycle using Ollama."""
 
     def __init__(self):
         # Configure the local LLM via Ollama

@@ -1,110 +1,183 @@
 ---
 title: AI Interview Bot
 emoji: 🤖
-colorFrom: blue
-colorTo: green
+colorFrom: green
+colorTo: blue
 sdk: docker
 pinned: false
 ---
 
-# 🚀 AI Interview Evaluation System
+# 🤖 AI Interview Evaluation System
 
-An advanced AI-powered interview simulator that provides autonomous, role-based technical assessments using local LLMs with **Cloud Persistence via Supabase**. The system features real-time scoring, **Autonomous Adaptive difficulty scaling**, and comprehensive senior-level performance analytics to help candidates prepare for high-stakes technical interviews.
+A production-ready, full-stack AI-powered mock interview platform. Select a role, start a session, answer questions in a chat-style interface, and receive a detailed performance report with a final **Hiring Verdict** — all powered by a local LLM running via Ollama.
 
 ---
 
 ## 🧠 Key Features
 
-* 🎯 **Phase-Based Assessment**: Specialized logic for *Candidate Introduction* and *Technical Assessment* phases.
-* 📊 **Senior Hiring Manager Reports**: Generates a professional performance summary including Executive Summary, Key Strengths, Technical Gaps, and a Development Roadmap.
-* 🎚️ **Autonomous Adaptive Difficulty**: The AI interviewer autonomously adjusts question difficulty (Beginner, Intermediate, Advanced) in real-time based on your performance.
-* ☁️ **Cloud Persistence (Supabase)**: All interview records are automatically synced to the cloud, allowing you to access your history from anywhere.
-* ⚡ **Strict Grading Engine**: Built-in relevance and accuracy checks to prevent generic "filler" answers from scoring points.
-* 📄 **Resume Integration**: Upload your resume (PDF/TXT) for a personalized interview experience tailored to your background.
-* 🤖 **Autonomous Conclusion**: The AI decides when it has gathered enough information to provide a final hiring verdict.
+- **💬 ChatGPT-Style Web UI** — Built with vanilla HTML, CSS, and JavaScript. No frontend framework required.
+- **⚡ FastAPI Backend** — Fully async REST API serving the interview lifecycle.
+- **🎯 Adaptive Difficulty** — AI automatically adjusts question depth (Beginner → Advanced) based on answer quality.
+- **📄 Resume Parsing** — Upload a PDF or TXT resume; the LLM tailors technical questions to your specific experience.
+- **📊 Performance Reports** — Structured reports with Executive Summary, Strengths, Technical Gaps, and a 3-step Development Roadmap.
+- **🏷️ Hiring Verdict** — AI renders a final decision: `Strong Hire`, `Hire`, `Leaning No Hire`, or `No Hire`.
+- **🗃️ Persistent History** — Interview sessions are saved to **Supabase** (cloud PostgreSQL) and listed in the sidebar.
+- **🗑️ Delete Sessions** — Remove any past interview directly from the sidebar.
+- **🐳 Dockerized** — Single-container deployment with automatic Ollama install and model pull at startup.
 
 ---
 
-## ⚙️ Tech Stack
+## 🏗️ Architecture
 
-* **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (ES6)
-* **Backend**: FastAPI
-* **AI Logic**: LangChain & Ollama (LLaMA 3.2:3B)
-* **Database**: Supabase (PostgreSQL)
-* **Language**: Python
-* **Deployment**: Docker & Hugging Face Spaces
-
----
-
-## 🤖 LLM Integration (Ollama)
-
-This project uses **Ollama (LLaMA 3.2:3B)** to run the language model locally, ensuring privacy and speed without external API costs.
-
-### Setup Ollama
-
-1. Install Ollama: [https://ollama.com/download](https://ollama.com/download)
-2. Pull the model:
-   ```bash
-   ollama run llama3.2:3b
-   ```
-3. Ensure Ollama is running before starting the app.
-
----
-
-## 🛠️ Environment Setup
-
-Create a `.env` file in the root directory and add your Supabase credentials:
-
-```env
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-anon-public-key
+```
+┌─────────────────────────────────────────┐
+│           Browser (Client)              │
+│  static/index.html + app.js + styles.css│
+└──────────────┬──────────────────────────┘
+               │ REST API (JSON)
+┌──────────────▼──────────────────────────┐
+│         FastAPI  (server.py)            │
+│  /api/interviews  /api/interviews/start │
+│  /api/interviews/answer                 │
+└──────┬───────────────────┬──────────────┘
+       │                   │
+┌──────▼──────┐   ┌────────▼────────┐
+│  llm_helper │   │ database_helper │
+│  (Ollama /  │   │  (Supabase DB)  │
+│  LangChain) │   └─────────────────┘
+└─────────────┘
 ```
 
 ---
 
-## 🧪 System Workflow
+## 🛠️ Tech Stack
 
-1. **Configuration**: User selects a role and optionally uploads a resume for personalized context.
-2. **Initial Phase**: Starts with a candidate introduction and experience walkthrough.
-3. **Technical Assessment**: System generates role-specific technical questions based on industry standards.
-4. **Evaluation & Adaptive Scaling**: 
-   * AI scores each answer (0–10) using a strict grading engine.
-   * Provides immediate feedback and improvement suggestions.
-   * Automatically scales difficulty for the next question based on performance.
-5. **Cloud Persistence**: Every exchange is instantly synced to **Supabase Cloud** for a persistent, multi-device history.
-6. **Autonomous Conclusion**: The AI interviewer decides when it has gathered enough high-quality data to provide a reliable hiring verdict.
-7. **Comprehensive Reporting**: Generates a deep-dive performance report including technical gaps and a hiring verdict.
+| Layer | Technology |
+|---|---|
+| Frontend | Vanilla HTML5, CSS3, JavaScript (ES6+) |
+| Backend | Python 3.9+, FastAPI, Uvicorn |
+| AI / LLM | Ollama (`llama3.2:3b`), LangChain |
+| Database | Supabase (PostgreSQL) |
+| Resume Parsing | PyPDF2 |
+| Deployment | Docker, Hugging Face Spaces |
 
 ---
 
-## ▶️ Run Locally
+## 🚀 Getting Started (Local)
+
+### 1. Prerequisites
+
+- Python 3.9+
+- [Ollama](https://ollama.com/) installed and running
+
+### 2. Pull the LLM model
 
 ```bash
+ollama pull llama3.2:3b
+```
+
+### 3. Clone & Install
+
+```bash
+git clone https://github.com/hemangvats/AI-Interview-Evaluation-System.git
+cd AI-Interview-Evaluation-System
 pip install -r requirements.txt
-uvicorn server:app --reload
+```
+
+### 4. Configure Environment
+
+Create a `.env` file in the project root:
+
+```env
+SUPABASE_URL=your-supabase-project-url
+SUPABASE_KEY=your-anon-public-key
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+> **No Supabase?** The app works without it — sessions are stored in memory for the current run.
+
+### 5. Run the Server
+
+```bash
+uvicorn server:app --host 0.0.0.0 --port 7860 --reload
+```
+
+Open your browser at `http://localhost:7860`.
+
+---
+
+## 🐳 Docker Deployment
+
+The included `Dockerfile` handles everything automatically:
+
+1. Installs Ollama inside the container
+2. Pulls the `llama3.2:3b` model on first boot
+3. Starts the FastAPI server on port `7860`
+
+```bash
+docker build -t ai-interview-bot .
+docker run -p 7860:7860 \
+  -e SUPABASE_URL=your-url \
+  -e SUPABASE_KEY=your-key \
+  ai-interview-bot
 ```
 
 ---
 
-## 🌐 Live Demo
+## 🗄️ Supabase Setup (Optional)
 
-🚀 Try the deployed app here:
-👉 [https://huggingface.co/spaces/Hemang18/AI-Interview-Bot](https://huggingface.co/spaces/Hemang18/AI-Interview-Bot)
+To enable persistent cloud-based chat history, create a table named `interviews` in your Supabase project with the following schema:
 
-✅ Live deployed using Hugging Face Spaces
+```sql
+CREATE TABLE interviews (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  session_id TEXT UNIQUE NOT NULL,
+  role TEXT,
+  difficulty TEXT,
+  messages JSONB,
+  evaluations JSONB,
+  questions JSONB,
+  current_q_index INT,
+  total_questions INT,
+  interview_complete BOOLEAN DEFAULT FALSE,
+  final_summary TEXT,
+  hiring_decision TEXT,
+  verdict_reasoning TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
 ---
 
-## 🚀 Future Improvements
+## 📁 Project Structure
 
-* Audio-based interview mode (Speech-to-Text & Text-to-Speech).
-* Multi-model support (Gemma 2, Mistral).
-* Exportable PDF reports.
+```
+├── server.py              # FastAPI backend — all API routes
+├── llm_helper.py          # LLM logic — question generation & evaluation
+├── database_helper.py     # Supabase client wrapper
+├── static/
+│   ├── index.html         # Main UI shell
+│   ├── app.js             # Frontend logic (API calls, DOM, state)
+│   └── styles.css         # Dark-themed CSS design system
+├── requirements.txt       # Python dependencies
+├── Dockerfile             # Single-container deployment config
+├── run.sh                 # Container startup script
+└── .github/
+    └── workflows/
+        └── sync_to_huggingface.yml  # Auto-sync GitHub → HF Spaces
+```
 
 ---
 
-## 🤝 Author
+## 🔮 Roadmap
 
-**Hemang Vats**
-B.Tech CSE | AI/ML Enthusiast
+- [ ] Voice-based interview simulation (Speech-to-Text)
+- [ ] FAISS / vector DB integration for curated question banks
+- [ ] Multi-user authentication
 
+---
+
+## 📄 License
+
+MIT License — free to use, modify, and distribute.

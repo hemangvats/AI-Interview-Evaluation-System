@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Prep Bot</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js for Markdown Parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-text">AI Interview Bot</span>
+                </div>
+                <button id="new-interview-btn" class="btn btn-new">
+                    <i class="fa-solid fa-plus"></i> New Interview
+                </button>
+            </div>
+
+            <div class="sidebar-scroll">
+                <div class="section-title">Recents</div>
+                <div id="recents-list" class="recents-list">
+                    <!-- Loaded dynamically -->
+                    <div class="loading-placeholder">Loading recent sessions...</div>
+                </div>
+
+                <div class="sidebar-divider"></div>
+
+                <div class="section-title">Interview Settings</div>
+                <form id="settings-form" class="settings-form">
+                    <div class="form-group">
+                        <label for="role-select">Select Position</label>
+                        <select id="role-select" required>
+                            <!-- Dynamically loaded from /api/config -->
+                            <option value="" disabled selected>Loading roles...</option>
+                        </select>
+                    </div>
+
+                    <div class="info-card">
+                        <span class="info-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                        <div class="info-text">
+                            <strong>Adaptive AI Evaluation</strong>
+                            <p>Difficulty auto-adjusts based on answer quality. Standard length: 5 to 15 exchanges.</p>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-divider"></div>
+
+                    <div class="section-title">Personalize (Optional)</div>
+                    <div class="form-group">
+                        <label class="file-upload-label">
+                            <input type="file" id="resume-file" accept=".pdf,.txt">
+                            <span class="file-upload-btn">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span id="file-name-display">Upload Resume (PDF/TXT)</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <button type="submit" id="start-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-play"></i> Start Interview
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Empty State (Initial View) -->
+            <div id="view-empty" class="view-state active">
+                <div class="empty-state-content">
+                    <div class="empty-icon"><i class="fa-solid fa-comments"></i></div>
+                    <h1>Where should we begin?</h1>
+                    <p>Select your desired role in the sidebar and click <strong>Start Interview</strong> to launch the
+                        AI session.</p>
+
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <i class="fa-solid fa-code"></i>
+                            <h3>Role Tailored</h3>
+                            <p>Generates technical questions specific to your discipline.</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fa-solid fa-sliders"></i>
+                            <h3>Adaptive Difficulty</h3>
+                            <p>Dynamically scales query depth matching your performance.</p>
+                        </div>
+                        <div class="feature-card">
+                            <i class="fa-solid fa-chart-column"></i>
+                            <h3>Performance Analytics</h3>
+                            <p>Delivers structured score reports & improvement plans.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container disabled-input">
+                    <div class="chat-input-wrapper">
+                        <input type="text" placeholder="Configure sidebar to start..." disabled>
+                        <button disabled><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Chat State -->
+            <div id="view-chat" class="view-state">
+                <header class="chat-header">
+                    <div class="header-info">
+                        <h2 id="chat-title">Interviewing for: AI Engineer</h2>
+                        <span id="difficulty-badge" class="badge">Adaptive</span>
+                    </div>
+                    <div id="status-badge" class="badge status-active">Active</div>
+                </header>
+
+                <div id="messages-container" class="messages-container">
+                    <!-- Messages populated dynamically -->
+                </div>
+
+                <div id="typing-indicator" class="typing-indicator hidden">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <span class="typing-label">AI is evaluating...</span>
+                </div>
+
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chat-input" placeholder="Type your answer here..." rows="1"></textarea>
+                        <button id="send-btn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                    <div class="chat-input-tip">Press Enter to send, Shift + Enter for new line.</div>
+                </div>
+            </div>
+
+            <!-- Performance Report / Completed State -->
+            <div id="view-report" class="view-state">
+                <header class="report-header">
+                    <h2><i class="fa-solid fa-award"></i> Interview Performance Dashboard</h2>
+                    <button id="report-new-btn" class="btn btn-secondary"><i class="fa-solid fa-rotate-left"></i> Start
+                        New Interview</button>
+                </header>
+
+                <div class="report-container">
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fa-solid fa-arrows-spin"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Exchanges</span>
+                                <span id="stat-exchanges" class="stat-value">0</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fa-solid fa-star"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Avg Technical Score</span>
+                                <span id="stat-avg-score" class="stat-value">0.0/10</span>
+                            </div>
+                        </div>
+                        <div class="stat-card decision-card" id="hiring-card">
+                            <div class="stat-icon"><i class="fa-solid fa-signature"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Hiring Verdict</span>
+                                <span id="stat-verdict" class="stat-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verdict Reasoning Card -->
+                    <div class="report-card verdict-reasoning-card">
+                        <h3><i class="fa-solid fa-circle-info"></i> Verdict Justification</h3>
+                        <p id="report-verdict-reasoning">-</p>
+                    </div>
+
+                    <!-- Detailed Performance Report (Markdown) -->
+                    <div class="report-card">
+                        <h3><i class="fa-solid fa-file-invoice"></i> Detailed Performance Report</h3>
+                        <div id="report-summary-markdown" class="markdown-body">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Question Breakdown List -->
+                    <div class="report-card">
+                        <h3><i class="fa-solid fa-list-check"></i> Answer & Evaluation Breakdown</h3>
+                        <div id="report-questions-breakdown" class="breakdown-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Script Entrypoint -->
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

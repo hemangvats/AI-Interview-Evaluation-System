@@ -27,7 +27,8 @@ An advanced AI-powered interview simulator that provides autonomous, role-based 
 
 ## ⚙️ Tech Stack
 
-* **Frontend**: Streamlit
+* **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (ES6)
+* **Backend**: FastAPI
 * **AI Logic**: LangChain & Ollama (LLaMA 3.2:3B)
 * **Database**: Supabase (PostgreSQL)
 * **Language**: Python
@@ -80,7 +81,7 @@ SUPABASE_KEY=your-anon-public-key
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+uvicorn server:app --reload
 ```
 
 ---

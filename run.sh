@@ -12,6 +12,6 @@ sleep 5
 echo "Pulling llama3.2:3b model..."
 ollama pull llama3.2:3b
 
-# Start Streamlit on port 7860
-echo "Starting Streamlit..."
-streamlit run app.py --server.port 7860 --server.address 0.0.0.0
+# Start FastAPI server on port 7860
+echo "Starting FastAPI server..."
+uvicorn server:app --host 0.0.0.0 --port 7860

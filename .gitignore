@@ -16,6 +16,7 @@ env/
 
 # Chat history (user data)
 chat_history/
+interview_history/
 
 # Streamlit secrets
 .streamlit/secrets.toml

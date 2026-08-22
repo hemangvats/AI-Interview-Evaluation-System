@@ -16,4 +16,7 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push https://Hemang18:$HF_TOKEN@huggingface.co/spaces/Hemang18/AI-Interview-Bot main --force
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push --force https://Hemang18:${HF_TOKEN}@huggingface.co/spaces/Hemang18/AI-Interview-Bot main:main

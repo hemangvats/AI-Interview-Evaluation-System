@@ -55,22 +55,33 @@ if (window.marked) {
 // ----------------------------------------
 
 async function fetchConfig() {
-    try {
-        const response = await fetch('/api/config');
-        if (!response.ok) throw new Error('Failed to load configuration');
-        const data = await response.json();
-        
-        // Populate Roles Select
+    const defaultRoles = [
+        "AI Engineer", 
+        "Software Developer", 
+        "Data Scientist", 
+        "Web Developer", 
+        "Frontend Developer", 
+        "Backend Developer"
+    ];
+    
+    function populateRoles(roles) {
         roleSelect.innerHTML = '<option value="" disabled selected>Select Position</option>';
-        data.roles.forEach(role => {
+        roles.forEach(role => {
             const option = document.createElement('option');
             option.value = role;
             option.textContent = role;
             roleSelect.appendChild(option);
         });
+    }
+
+    try {
+        const response = await fetch('/api/config');
+        if (!response.ok) throw new Error('Failed to load configuration');
+        const data = await response.json();
+        populateRoles(data.roles || defaultRoles);
     } catch (error) {
-        console.error('Error fetching config:', error);
-        roleSelect.innerHTML = '<option value="" disabled>Error loading roles</option>';
+        console.error('Error fetching config, using fallback roles:', error);
+        populateRoles(defaultRoles);
     }
 }
 

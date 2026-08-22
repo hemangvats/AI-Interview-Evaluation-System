@@ -421,7 +421,7 @@ function renderChat(session) {
         
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
-        avatar.innerHTML = msg.role === 'assistant' ? '<img src="/static/saathi_logo.png" alt="Saathi" class="avatar-logo-img">' : '<i class="fa-solid fa-user"></i>';
+        avatar.innerHTML = msg.role === 'assistant' ? '<img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img">' : '<i class="fa-solid fa-user"></i>';
         
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';

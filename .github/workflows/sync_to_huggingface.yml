@@ -1,19 +1,24 @@
-name: Sync to Hugging Face hub
+name: Sync to Hugging Face Hub
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Sync to Hugging Face Hub
-        uses: noplanman/huggingface-sync-action@v1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync to Hugging Face
+        uses: huggingface/hub-sync@v0.1.0
         with:
           github_repo_id: ${{ github.repository }}
           huggingface_repo_id: Hemang18/AI-Interview-Bot
           hf_token: ${{ secrets.HF_TOKEN }}
           repo_type: space
+          space_sdk: docker

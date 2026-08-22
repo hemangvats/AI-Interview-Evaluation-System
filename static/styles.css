@@ -124,7 +124,7 @@ button{cursor:pointer;}
   flex-shrink:0;overflow:hidden;
 }
 .brand-logo-img{
-  width:100%;height:100%;object-fit:cover;display:block;
+  width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;
 }
 .brand-name{display:block;font-size:13px;font-weight:600;color:var(--t1);letter-spacing:-0.01em;line-height:1.2;}
 .brand-sub{display:block;font-size:10px;color:var(--t3);font-weight:400;line-height:1.1;margin-top:1px;}
@@ -282,7 +282,7 @@ button{cursor:pointer;}
   font-size:11px;color:#fff;overflow:hidden;
 }
 .avatar-logo-img{
-  width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;
+  width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:inherit;
 }
 .success-avatar{background:linear-gradient(135deg,#16a34a,var(--green));}
 

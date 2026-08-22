@@ -71,7 +71,7 @@ class InterviewManager:
         q_type = "behavioral (STAR method)" if is_behavioral else "technical"
         
         template = (
-            "You are an expert technical interviewer. Generate {num_questions} {difficulty} level {q_type} "
+            "You are Saathi, an expert AI Interview Coach. Generate {num_questions} {difficulty} level {q_type} "
             "interview questions for a {role} position. "
         )
         
@@ -115,7 +115,7 @@ class InterviewManager:
         is_intro = (question_count == 1)
         phase_name = "Candidate Introduction" if is_intro else "Technical Assessment"
         
-        template = """You are a senior professional technical interviewer for a {difficulty} level {role} role.
+        template = """You are Saathi, a friendly, intelligent, encouraging, and professional AI Interview Coach evaluating a candidate for a {difficulty} level {role} role.
 Current Progress: Question {question_count}
 Phase: {phase_name}
 

@@ -98,6 +98,7 @@ async function loadSession(sessionId) {
         activeSessionId = sessionId;
         
         updateSidebarActiveState(sessionId);
+        closeMobileDrawer();
         
         if (session.interview_complete) {
             showView('report');
@@ -114,25 +115,40 @@ async function loadSession(sessionId) {
     }
 }
 
+function closeMobileDrawer() {
+    document.querySelector('.sidebar')?.classList.remove('drawer-open');
+    document.getElementById('drawer-overlay')?.classList.remove('active');
+}
+
 async function deleteSession(sessionId, event) {
-    event.stopPropagation(); // Prevent loading the session
-    if (!confirm('Are you sure you want to delete this interview record?')) return;
-    
+    event.stopPropagation();
+    event.preventDefault();
+
+    // Optimistically remove the row from the UI immediately
+    const row = document.querySelector(`.recent-item[data-id="${sessionId}"]`);
+    if (row) row.remove();
+
+    // If the list is now empty, show placeholder
+    if (recentsList.querySelectorAll('.recent-item').length === 0) {
+        recentsList.innerHTML = '<div class="loading-placeholder">No recent interviews.</div>';
+    }
+
+    // If we deleted the open session, go back to empty state
+    if (activeSessionId === sessionId) {
+        currentSession = null;
+        activeSessionId = null;
+        showView('empty');
+    }
+
     try {
         const response = await fetch(`/api/interviews/${sessionId}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete interview');
-        
-        // If we deleted the open session, go back to empty state
-        if (activeSessionId === sessionId) {
-            currentSession = null;
-            activeSessionId = null;
-            showView('empty');
-        }
-        
+        // Refresh from server to ensure consistency
         fetchRecents();
     } catch (error) {
-        alert('Error deleting session: ' + error.message);
-        console.error(error);
+        console.error('Error deleting session:', error);
+        // Re-fetch to restore correct state if API call failed
+        fetchRecents();
     }
 }
 
@@ -163,10 +179,11 @@ async function startNewInterview(role, resumeFile) {
         showView('chat');
         renderChat(session);
         fetchRecents();
+        closeMobileDrawer();
         
         // Reset file upload
         resumeFileInput.value = '';
-        fileNameDisplay.innerHTML = 'Upload Resume (PDF/TXT)';
+        fileNameDisplay.textContent = 'Attach Resume';
     } catch (error) {
         alert('Error starting interview: ' + error.message);
         console.error(error);
@@ -233,12 +250,33 @@ async function submitUserAnswer(answerText) {
 // ----------------------------------------
 
 function setupEventListeners() {
+    // Mobile drawer toggle
+    const menuToggle = document.getElementById('menu-toggle');
+    const drawerOverlay = document.getElementById('drawer-overlay');
+    const sidebar = document.querySelector('.sidebar');
+
+    function toggleDrawer(open) {
+        if (!sidebar || !drawerOverlay) return;
+        const shouldOpen = open !== undefined ? open : !sidebar.classList.contains('drawer-open');
+        sidebar.classList.toggle('drawer-open', shouldOpen);
+        drawerOverlay.classList.toggle('active', shouldOpen);
+    }
+
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => toggleDrawer());
+    }
+
+    if (drawerOverlay) {
+        drawerOverlay.addEventListener('click', () => toggleDrawer(false));
+    }
+
     // New Interview Button click
     newInterviewBtn.addEventListener('click', () => {
         currentSession = null;
         activeSessionId = null;
         updateSidebarActiveState(null);
         showView('empty');
+        toggleDrawer(false);
     });
 
     // Start New Interview from Dashboard click
@@ -247,15 +285,16 @@ function setupEventListeners() {
         activeSessionId = null;
         updateSidebarActiveState(null);
         showView('empty');
+        toggleDrawer(false);
     });
 
     // File input change (resume)
     resumeFileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             fileNameDisplay.textContent = e.target.files[0].name;
-            fileNameDisplay.style.color = '#fff';
+            fileNameDisplay.style.color = 'var(--t1)';
         } else {
-            fileNameDisplay.textContent = 'Upload Resume (PDF/TXT)';
+            fileNameDisplay.textContent = 'Attach Resume';
             fileNameDisplay.style.color = '';
         }
     });
@@ -363,7 +402,7 @@ function showView(viewName) {
 }
 
 function renderChat(session) {
-    chatTitle.textContent = `Interviewing for: ${session.role}`;
+    chatTitle.textContent = `Saathi · ${session.role}`;
     difficultyBadge.textContent = session.difficulty;
     
     if (session.interview_complete) {
@@ -382,7 +421,7 @@ function renderChat(session) {
         
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
-        avatar.innerHTML = msg.role === 'assistant' ? '<i class="fa-solid fa-robot"></i>' : '<i class="fa-solid fa-user"></i>';
+        avatar.innerHTML = msg.role === 'assistant' ? '<img src="/static/saathi_logo.png" alt="Saathi" class="avatar-logo-img">' : '<i class="fa-solid fa-user"></i>';
         
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';

@@ -133,7 +133,7 @@ async def start_interview(
         "difficulty": "Adaptive",
         "messages": [{
             "role": "assistant",
-            "content": f"Hello! I am your AI Interviewer today. I'll be evaluating your fit for the **{role}** position.\n\nPlease introduce yourself and walk me through your relevant experience for this role."
+            "content": f"Hello! I am Saathi, your AI Interview Coach. I'll be evaluating your fit for the **{role}** position.\n\nPlease introduce yourself and walk me through your relevant experience for this role."
         }],
         "questions": ["Introduction and Candidate Walkthrough"],
         "current_q_index": 0,

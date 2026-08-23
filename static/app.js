@@ -22,8 +22,42 @@ const difficultyBadge = document.getElementById('difficulty-badge');
 const statusBadge = document.getElementById('status-badge');
 const messagesContainer = document.getElementById('messages-container');
 const typingIndicator = document.getElementById('typing-indicator');
+const typingLabel = document.querySelector('.typing-label');
+const questionProgressLabel = document.getElementById('question-progress-label');
+const questionProgressFill = document.getElementById('question-progress-fill');
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
+
+// Typing state cycling
+const TYPING_STATES = [
+    'Saathi is thinking...',
+    'Evaluating your response...',
+    'Preparing next question...'
+];
+let _typingCycleTimer = null;
+
+function startTypingCycle() {
+    if (!typingLabel) return;
+    let idx = 0;
+    typingLabel.textContent = TYPING_STATES[0];
+    _typingCycleTimer = setInterval(() => {
+        idx = (idx + 1) % TYPING_STATES.length;
+        typingLabel.style.opacity = '0';
+        setTimeout(() => {
+            if (typingLabel) typingLabel.textContent = TYPING_STATES[idx];
+            typingLabel.style.opacity = '1';
+        }, 150);
+    }, 2200);
+}
+
+function stopTypingCycle() {
+    clearInterval(_typingCycleTimer);
+    _typingCycleTimer = null;
+    if (typingLabel) {
+        typingLabel.textContent = TYPING_STATES[0];
+        typingLabel.style.opacity = '1';
+    }
+}
 
 // Report DOM Elements
 const reportNewBtn = document.getElementById('report-new-btn');
@@ -214,6 +248,7 @@ async function submitUserAnswer(answerText) {
     chatInput.disabled = true;
     sendBtn.disabled = true;
     typingIndicator.classList.remove('hidden');
+    startTypingCycle();
     
     // Add user message locally for instant response feel
     appendUserMessage(answerText);
@@ -249,6 +284,7 @@ async function submitUserAnswer(answerText) {
         alert('Evaluation Error: ' + error.message);
         console.error(error);
     } finally {
+        stopTypingCycle();
         typingIndicator.classList.add('hidden');
         chatInput.disabled = false;
         sendBtn.disabled = false;
@@ -410,102 +446,229 @@ function showView(viewName) {
     if (viewName === 'empty') viewEmpty.classList.add('active');
     if (viewName === 'chat') viewChat.classList.add('active');
     if (viewName === 'report') viewReport.classList.add('active');
+
+    // Update setup controls active state
+    updateSetupControlsState(viewName);
+}
+
+function updateSetupControlsState(viewName) {
+    const isSessionActive = (viewName === 'chat' || viewName === 'report');
+    const sidebarSetup = document.querySelector('.sidebar-setup');
+    
+    if (sidebarSetup) {
+        sidebarSetup.classList.toggle('session-active', isSessionActive);
+    }
+    
+    if (roleSelect) roleSelect.disabled = isSessionActive;
+    if (resumeFileInput) {
+        resumeFileInput.disabled = isSessionActive;
+        const fileLabel = document.querySelector('.file-label');
+        if (fileLabel) {
+            fileLabel.classList.toggle('disabled', isSessionActive);
+        }
+    }
+    if (startBtn) {
+        startBtn.disabled = isSessionActive;
+    }
 }
 
 function renderChat(session) {
-    chatTitle.textContent = `Saathi · ${session.role}`;
-    difficultyBadge.textContent = session.difficulty;
-    
+    // Update compact header
+    chatTitle.textContent = session.role || 'Interview';
+    difficultyBadge.textContent = session.difficulty || 'Adaptive';
+
+    // Progress bar
+    const totalQs = session.total_questions || 15;
+    const currentQ = (session.current_q_index != null) ? session.current_q_index + 1 : 1;
+    if (questionProgressLabel) {
+        questionProgressLabel.textContent = `Question ${currentQ} of ${totalQs}`;
+    }
+    if (questionProgressFill) {
+        const pct = Math.min(100, Math.max(2, (currentQ / totalQs) * 100));
+        questionProgressFill.style.width = `${pct}%`;
+    }
+
+    // Status badge
     if (session.interview_complete) {
         statusBadge.textContent = 'Complete';
-        statusBadge.className = 'badge status-complete';
+        statusBadge.className = 'status-pill status-complete';
     } else {
-        statusBadge.textContent = 'Active';
-        statusBadge.className = 'badge status-active';
+        statusBadge.textContent = 'Live';
+        statusBadge.className = 'status-pill status-active';
     }
-    
+
     messagesContainer.innerHTML = '';
-    
+
     session.messages.forEach((msg, idx) => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message ${msg.role}`;
-        
+
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
-        avatar.innerHTML = msg.role === 'assistant' ? '<img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img">' : '<i class="fa-solid fa-user"></i>';
-        
+        avatar.innerHTML = msg.role === 'assistant'
+            ? '<img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img">'
+            : '<i class="fa-solid fa-user"></i>';
+
+        const senderLabel = document.createElement('div');
+        senderLabel.className = 'msg-sender';
+        senderLabel.textContent = msg.role === 'assistant' ? 'Saathi' : 'You';
+
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
-        
-        // Check if there is evaluations feedback context for the assistant message (excluding the first welcome msg)
-        let parsedContent = msg.content;
+
+        let parsedContent;
         if (msg.role === 'assistant' && idx > 0) {
-            // Find if there is an evaluation for this step
-            // Let's format the feedback to look extremely premium in custom containers
             parsedContent = parseAssistantFeedback(msg.content);
         } else {
             parsedContent = window.marked ? window.marked.parse(msg.content) : msg.content;
         }
-        
         bubble.innerHTML = parsedContent;
-        
+
+        const body = document.createElement('div');
+        body.className = 'msg-body';
+        body.appendChild(senderLabel);
+        body.appendChild(bubble);
+
         msgDiv.appendChild(avatar);
-        msgDiv.appendChild(bubble);
+        msgDiv.appendChild(body);
         messagesContainer.appendChild(msgDiv);
     });
-    
+
     scrollToBottom();
 }
 
 function appendUserMessage(text) {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'chat-message user';
-    
+
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
     avatar.innerHTML = '<i class="fa-solid fa-user"></i>';
-    
+
+    const senderLabel = document.createElement('div');
+    senderLabel.className = 'msg-sender';
+    senderLabel.textContent = 'You';
+
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     bubble.textContent = text;
-    
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+    body.appendChild(senderLabel);
+    body.appendChild(bubble);
+
     msgDiv.appendChild(avatar);
-    msgDiv.appendChild(bubble);
+    msgDiv.appendChild(body);
     messagesContainer.appendChild(msgDiv);
 }
 
 function parseAssistantFeedback(rawText) {
-    // Custom beautifier of feedback blocks:
+    // Parse the structured feedback format from server.py:
     // **Previous Reply Feedback**:
-    // - **Score**: 8/10
-    // - **Feedback**: Excellent explanation...
-    // - **Improvement**: You could mention...
-    // 📈 *Great job! Increasing difficulty...*
+    // - **Score**: N/10
+    // - **Feedback**: ...
+    // - **Improvement**: ...
+    // 📈/📉 *Difficulty adjusted...*
     // ---
-    // **Question 2**: Explain HTTP requests...
-    
-    let html = rawText;
-    
-    // We will parse standard markdown
-    if (window.marked) {
-        html = window.marked.parse(rawText);
+    // **Question N**: ...
+
+    // --- Extract structured parts using regex on raw text ---
+    const scoreMatch = rawText.match(/-\s*\*\*Score\*\*:\s*(\d+(?:\.\d+)?)\/10/i);
+    const feedbackMatch = rawText.match(/-\s*\*\*Feedback\*\*:\s*([^\n\-]+(?:\n(?!\s*-)(?!\s*\*\*)[^\n]*)*)/i);
+    const improvementMatch = rawText.match(/-\s*\*\*Improvement\*\*:\s*([^\n\-]+(?:\n(?!\s*-)(?!\s*\*\*)[^\n]*)*)/i);
+    const diffIncreaseMatch = rawText.match(/📈[^\n]*/i);
+    const diffDecreaseMatch = rawText.match(/📉[^\n]*/i);
+
+    // Extract next question — everything after '---'
+    const separatorIdx = rawText.indexOf('---');
+    const afterSeparator = separatorIdx !== -1 ? rawText.slice(separatorIdx + 3).trim() : '';
+    const completionMatch = rawText.match(/🎉[^\n]*/i);
+
+    // --- If no structured feedback found, fall back to markdown rendering ---
+    const hasStructuredFeedback = scoreMatch || feedbackMatch || improvementMatch;
+    if (!hasStructuredFeedback) {
+        return window.marked ? window.marked.parse(rawText) : rawText;
     }
-    
-    // Inject Custom Badge styles around score text
-    const scoreRegex = /Score<\/strong>:\s*(\d+)\/10/i;
-    const scoreMatch = html.match(scoreRegex);
-    if (scoreMatch) {
-        const scoreVal = parseInt(scoreMatch[1]);
-        let badgeClass = 'low';
-        if (scoreVal >= 8) badgeClass = 'high';
-        else if (scoreVal >= 5) badgeClass = 'medium';
-        
-        const badgeHtml = `<span class="score-badge ${badgeClass}"><i class="fa-solid fa-gauge-high"></i> Score: ${scoreVal}/10</span>`;
-        // Replace the whole list element containing Score or prefix it
-        html = html.replace(/<strong>Score<\/strong>:\s*\d+\/10/i, `<strong>Score</strong>: ${badgeHtml}`);
+
+    // --- Build the feedback card ---
+    const scoreVal = scoreMatch ? parseFloat(scoreMatch[1]) : null;
+    let badgeClass = 'needs-improvement';
+    let badgeLabel = 'Needs Work';
+    if (scoreVal !== null) {
+        if (scoreVal >= 8) { badgeClass = 'excellent'; badgeLabel = 'Excellent'; }
+        else if (scoreVal >= 6) { badgeClass = 'strong'; badgeLabel = 'Strong'; }
     }
-    
-    return html;
+
+    const feedbackText = feedbackMatch ? feedbackMatch[1].trim() : '';
+    const improvementText = improvementMatch ? improvementMatch[1].trim() : '';
+
+    // Difficulty adjustment banner
+    let diffBanner = '';
+    if (diffIncreaseMatch) {
+        let diffText = diffIncreaseMatch[0].replace(/📈\s*\*?/g, '').replace(/\*$/g, '').trim();
+        diffText = diffText.replace(/\*/g, '');
+        diffBanner = `<div class="difficulty-adjusted-banner up"><i class="fa-solid fa-arrow-trend-up"></i> ${diffText}</div>`;
+    } else if (diffDecreaseMatch) {
+        let diffText = diffDecreaseMatch[0].replace(/📉\s*\*?/g, '').replace(/\*$/g, '').trim();
+        diffText = diffText.replace(/\*/g, '');
+        diffBanner = `<div class="difficulty-adjusted-banner down"><i class="fa-solid fa-arrow-trend-down"></i> ${diffText}</div>`;
+    }
+
+    let cardHtml = `<div class="feedback-card">`;
+
+    // Header: Score + badge
+    cardHtml += `<div class="feedback-card-header">`;
+    cardHtml += `<div class="feedback-score-container">`;
+    cardHtml += `<span class="feedback-score-label">Score</span>`;
+    cardHtml += `<span class="feedback-score-value">${scoreVal !== null ? scoreVal + '/10' : '—'}</span>`;
+    cardHtml += `</div>`;
+    cardHtml += `<span class="feedback-badge-tag ${badgeClass}">${badgeLabel}</span>`;
+    cardHtml += `</div>`;  // end header
+
+    const cleanFeedback = sanitizeFeedbackText(feedbackText);
+    const cleanImprovement = sanitizeFeedbackText(improvementText);
+
+    // Content sections
+    cardHtml += `<div class="feedback-card-content">`;
+
+    if (cleanFeedback) {
+        let sectionTitle = '<i class="fa-solid fa-check feedback-icon-green"></i> What went well';
+        if (scoreVal !== null) {
+            if (scoreVal === 0) {
+                sectionTitle = '<i class="fa-solid fa-triangle-exclamation feedback-icon-red"></i> Why this scored low';
+            } else if (scoreVal <= 3) {
+                sectionTitle = '<i class="fa-solid fa-circle-exclamation feedback-icon-amber"></i> Key issue';
+            }
+        }
+        cardHtml += `<div class="feedback-section-item">`;
+        cardHtml += `<div class="feedback-section-title">${sectionTitle}</div>`;
+        cardHtml += `<div class="feedback-section-body">${cleanFeedback}</div>`;
+        cardHtml += `</div>`;
+    }
+
+    if (cleanImprovement) {
+        cardHtml += `<div class="feedback-section-item">`;
+        cardHtml += `<div class="feedback-section-title"><i class="fa-solid fa-arrow-right feedback-icon-amber"></i> Improve</div>`;
+        cardHtml += `<div class="feedback-section-body">${cleanImprovement}</div>`;
+        cardHtml += `</div>`;
+    }
+
+    cardHtml += `</div>`;  // end content
+
+    if (diffBanner) cardHtml += diffBanner;
+
+    cardHtml += `</div>`;  // end feedback-card
+
+    // Append next question or completion message below the card
+    let followHtml = '';
+    if (completionMatch) {
+        followHtml = window.marked ? window.marked.parse(afterSeparator || completionMatch[0]) : (afterSeparator || completionMatch[0]);
+    } else if (afterSeparator) {
+        followHtml = window.marked ? window.marked.parse(afterSeparator) : afterSeparator;
+    }
+
+    return cardHtml + (followHtml ? `<div style="margin-top:16px">${followHtml}</div>` : '');
 }
 
 function renderReport(session) {
@@ -521,7 +684,24 @@ function renderReport(session) {
     statAvgScore.textContent = `${avg.toFixed(1)}/10`;
     
     // Hiring Verdict styling
-    const verdict = session.hiring_decision || 'Pending';
+    let verdict = session.hiring_decision;
+    if (!verdict || verdict === 'Pending' || verdict === 'Decision Pending') {
+        // Fallback to the last evaluation's hiring decision
+        if (evals.length > 0) {
+            const lastEval = evals[evals.length - 1].evaluation || {};
+            if (lastEval.hiring_decision) {
+                verdict = lastEval.hiring_decision;
+            }
+        }
+    }
+    
+    // If still not set or pending, compute a verdict based on average score
+    if (!verdict || verdict === 'Pending' || verdict === 'Decision Pending') {
+        if (avg >= 8) verdict = 'Strong Hire';
+        else if (avg >= 6) verdict = 'Hire';
+        else if (avg >= 4) verdict = 'Leaning No Hire';
+        else verdict = 'No Hire';
+    }
     statVerdict.textContent = verdict;
     
     // Reset classes
@@ -533,11 +713,34 @@ function renderReport(session) {
     else if (cleanVerdict.includes('hire')) hiringCard.classList.add('hire');
     
     // Verdict Reasoning
-    reportVerdictReasoning.textContent = session.verdict_reasoning || 'No summary reasoning provided.';
+    let reasoning = session.verdict_reasoning;
+    if (!reasoning || reasoning === 'No summary reasoning provided.' || reasoning.trim() === '') {
+        if (evals.length > 0) {
+            const lastEval = evals[evals.length - 1].evaluation || {};
+            if (lastEval.verdict_reasoning) {
+                reasoning = lastEval.verdict_reasoning;
+            }
+        }
+    }
+    
+    // User-friendly fallback if still not provided
+    if (!reasoning || reasoning === 'No summary reasoning provided.' || reasoning.trim() === '') {
+        if (verdict === 'Strong Hire') {
+            reasoning = 'The candidate demonstrated exceptional expertise and clear structured communication throughout the assessment, showing strong mastery of the core competencies required for this position.';
+        } else if (verdict === 'Hire') {
+            reasoning = 'The candidate met all key technical requirements for the position with solid overall performance and clear reasoning. Ready for team alignment and next interview stage.';
+        } else if (verdict === 'Leaning No Hire') {
+            reasoning = 'The candidate showed promise and base technical concepts but exhibited some knowledge gaps or conceptual inconsistencies that need further review.';
+        } else {
+            reasoning = 'The candidate did not meet the core technical expectations for this role. Significant training or conceptual preparation is recommended before re-assessment.';
+        }
+    }
+    reportVerdictReasoning.textContent = reasoning;
     
     // Compile Performance Report markdown
     if (session.final_summary) {
-        reportSummaryMarkdown.innerHTML = window.marked ? window.marked.parse(session.final_summary) : session.final_summary;
+        const rawHtml = window.marked ? window.marked.parse(session.final_summary) : session.final_summary;
+        reportSummaryMarkdown.innerHTML = makeReportSectionsCollapsible(rawHtml);
     } else {
         reportSummaryMarkdown.innerHTML = '<p class="loading-placeholder">Performance report summary unavailable.</p>';
     }
@@ -592,6 +795,62 @@ function renderReport(session) {
     });
 }
 
+function makeReportSectionsCollapsible(htmlContent) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    
+    const headings = tempDiv.querySelectorAll('h2');
+    if (headings.length === 0) {
+        return htmlContent;
+    }
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'collapsible-report-sections';
+    
+    // Grab any elements before the first h2
+    const firstHeading = headings[0];
+    let introSibling = tempDiv.firstElementChild;
+    while (introSibling && introSibling !== firstHeading) {
+        const nextSibling = introSibling.nextElementSibling;
+        wrapper.appendChild(introSibling);
+        introSibling = nextSibling;
+    }
+    
+    headings.forEach((heading, idx) => {
+        const details = document.createElement('details');
+        details.className = 'report-details-section';
+        // Open the first section by default (Executive Summary)
+        if (idx === 0) {
+            details.open = true;
+        }
+        
+        const summary = document.createElement('summary');
+        summary.className = 'report-section-summary';
+        
+        summary.innerHTML = `
+            <span class="report-section-title">${heading.innerHTML}</span>
+            <i class="fa-solid fa-chevron-down report-section-chevron"></i>
+        `;
+        
+        details.appendChild(summary);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'report-section-content';
+        
+        let sibling = heading.nextElementSibling;
+        while (sibling && sibling.tagName !== 'H2') {
+            const nextSibling = sibling.nextElementSibling;
+            contentDiv.appendChild(sibling);
+            sibling = nextSibling;
+        }
+        
+        details.appendChild(contentDiv);
+        wrapper.appendChild(details);
+    });
+    
+    return wrapper.outerHTML;
+}
+
 // ----------------------------------------
 // UI Helpers
 // ----------------------------------------
@@ -619,4 +878,58 @@ function setStartButtonLoading(loading) {
         startBtn.disabled = false;
         startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start Interview';
     }
+}
+
+function sanitizeFeedbackText(text) {
+    if (!text) return '';
+    
+    let cleaned = text.trim();
+    
+    // Handle empty python list string literally
+    if (cleaned === '[]' || cleaned === '[""]' || cleaned === "['']") {
+        return '';
+    }
+    
+    // Check if it's a JSON or Python list representation like ["A", "B"] or ['A', 'B']
+    if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+        try {
+            let jsonText = cleaned.replace(/'/g, '"');
+            const arr = JSON.parse(jsonText);
+            if (Array.isArray(arr)) {
+                return arr.map(item => sanitizeFeedbackText(item)).filter(Boolean).join('<br>');
+            }
+        } catch (e) {
+            let content = cleaned.slice(1, -1).trim();
+            if (!content) return '';
+            const items = content.split(/['"],\s*['"]|",\s*"|',\s*'/).map(item => {
+                return item.replace(/^['"]|['"]$/g, '').trim();
+            }).filter(Boolean);
+            if (items.length > 0) {
+                return items.map(item => sanitizeFeedbackText(item)).filter(Boolean).join('<br>');
+            }
+        }
+    }
+    
+    // Strip bold Markdown **bold** -> bold
+    cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+    // Strip italic Markdown *italic* -> italic
+    cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+    // Strip any residual single/double asterisks
+    cleaned = cleaned.replace(/\*/g, '');
+
+    // Split lines and clean leading list bullet characters or numbers
+    const lines = cleaned.split('\n').map(line => {
+        let l = line.trim();
+        // Remove leading bullets or numberings
+        l = l.replace(/^[-*•]\s+/, '');
+        l = l.replace(/^\d+\.\s+/, '');
+        // Remove any residual quotes
+        l = l.replace(/^['"]|['"]$/g, '');
+        return l.trim();
+    }).filter(Boolean);
+
+    if (lines.length > 1) {
+        return lines.map(l => `• ${l}`).join('<br>');
+    }
+    return lines[0] || '';
 }

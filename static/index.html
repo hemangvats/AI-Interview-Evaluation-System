@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=4.2">
 </head>
 <body>
 <div class="shell">
@@ -153,13 +153,29 @@
 
       <div class="context-bar">
         <div class="context-left">
-          <div class="ai-avatar"><img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img"></div>
-          <div>
-            <span class="context-title" id="chat-title">Interview with Saathi</span>
-            <span class="context-sub" id="difficulty-badge">Adaptive</span>
+          <div class="ai-avatar"><img src="/static/saathi_logo.svg" alt="Saathi Logo" class="avatar-logo-img"></div>
+          <div class="context-header-info">
+            <div class="context-header-brand">
+              <span class="brand-title">Saathi</span>
+              <span class="brand-subtitle">AI Interview Coach</span>
+            </div>
+            <div class="context-sub-info">
+              <span id="chat-title" class="role-text">Select Position</span>
+              <span class="dot-separator">•</span>
+              <span id="difficulty-badge" class="difficulty-text">Adaptive</span>
+            </div>
           </div>
         </div>
-        <span id="status-badge" class="status-pill status-active">Live</span>
+        
+        <div class="context-right">
+          <div class="interview-progress-bar-container">
+            <span id="question-progress-label" class="progress-label">Question 1</span>
+            <div class="progress-bar-track">
+              <div id="question-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+          <span id="status-badge" class="status-pill status-active">Live</span>
+        </div>
       </div>
 
       <div id="messages-container" class="messages-area"></div>
@@ -195,7 +211,7 @@
             <span class="context-sub">Performance Report</span>
           </div>
         </div>
-        <button id="report-new-btn" class="btn-ghost-sm">
+        <button id="report-new-btn" class="btn-primary-sm">
           <i class="fa-solid fa-rotate-left"></i> New Interview
         </button>
       </div>
@@ -231,9 +247,9 @@
           <p id="report-verdict-reasoning" class="rsection-body">—</p>
         </div>
 
-        <div class="report-section">
+        <div class="report-section-container-flat">
           <div class="rsection-label"><i class="fa-solid fa-file-invoice"></i> Performance Report</div>
-          <div id="report-summary-markdown" class="rsection-body markdown-body"></div>
+          <div id="report-summary-markdown"></div>
         </div>
 
         <div class="report-section">

@@ -2,6 +2,14 @@
 let currentSession = null;
 let activeSessionId = null;
 
+// Auth State Management
+let authState = {
+    isAuthenticated: false,
+    currentUser: null,
+    accessToken: localStorage.getItem('saathi_access_token') || null,
+    refreshToken: localStorage.getItem('saathi_refresh_token') || null
+};
+
 // DOM Elements
 const newInterviewBtn = document.getElementById('new-interview-btn');
 const recentsList = document.getElementById('recents-list');
@@ -10,6 +18,18 @@ const roleSelect = document.getElementById('role-select');
 const resumeFileInput = document.getElementById('resume-file');
 const fileNameDisplay = document.getElementById('file-name-display');
 const startBtn = document.getElementById('start-btn');
+
+// Auth DOM Elements
+const authModalOverlay = document.getElementById('auth-modal-overlay');
+const tabLoginBtn = document.getElementById('tab-login-btn');
+const tabRegisterBtn = document.getElementById('tab-register-btn');
+const authErrorBanner = document.getElementById('auth-error-banner');
+const authLoginForm = document.getElementById('auth-login-form');
+const authRegisterForm = document.getElementById('auth-register-form');
+const userProfileCard = document.getElementById('user-profile-card');
+const userDisplayName = document.getElementById('user-display-name');
+const userDisplayEmail = document.getElementById('user-display-email');
+const logoutBtn = document.getElementById('logout-btn');
 
 // View Containers
 const viewEmpty = document.getElementById('view-empty');
@@ -71,10 +91,26 @@ const reportQuestionsBreakdown = document.getElementById('report-questions-break
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    checkAuthSession();
     fetchConfig();
     fetchRecents();
     setupEventListeners();
+    setupAuthEventListeners();
+    setupLinkedInEventListeners();
+    setupGitHubEventListeners();
+    setupProfileEventListeners();
 });
+
+// Global XSS Sanitization Helper
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 // Configure marked options
 if (window.marked) {
@@ -83,6 +119,7 @@ if (window.marked) {
         gfm: true
     });
 }
+
 
 // ----------------------------------------
 // API Calls
@@ -121,7 +158,7 @@ async function fetchConfig() {
 
 async function fetchRecents() {
     try {
-        const response = await fetch('/api/interviews');
+        const response = await authenticatedFetch('/api/interviews');
         if (!response.ok) throw new Error('Failed to fetch recent interviews');
         const interviews = await response.json();
         
@@ -135,7 +172,7 @@ async function fetchRecents() {
 async function loadSession(sessionId) {
     try {
         showGlobalLoader(true);
-        const response = await fetch(`/api/interviews/${sessionId}`);
+        const response = await authenticatedFetch(`/api/interviews/${sessionId}`);
         if (!response.ok) throw new Error('Failed to load interview details');
         const session = await response.json();
         
@@ -186,7 +223,7 @@ async function deleteSession(sessionId, event) {
     }
 
     try {
-        const response = await fetch(`/api/interviews/${sessionId}`, { method: 'DELETE' });
+        const response = await authenticatedFetch(`/api/interviews/${sessionId}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Failed to delete interview');
         // Refresh from server to ensure consistency
         fetchRecents();
@@ -207,7 +244,7 @@ async function startNewInterview(role, resumeFile) {
             formData.append('resume', resumeFile);
         }
         
-        const response = await fetch('/api/interviews/start', {
+        const response = await authenticatedFetch('/api/interviews/start', {
             method: 'POST',
             body: formData
         });
@@ -255,7 +292,7 @@ async function submitUserAnswer(answerText) {
     scrollToBottom();
     
     try {
-        const response = await fetch('/api/interviews/answer', {
+        const response = await authenticatedFetch('/api/interviews/answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -376,6 +413,30 @@ function setupEventListeners() {
         }
     });
 
+    // Dashboard Card Click Listeners
+    const dashProfileCard = document.getElementById('dash-card-profile');
+    if (dashProfileCard) {
+        dashProfileCard.addEventListener('click', openProfileModal);
+    }
+
+    const dashLinkedinCard = document.getElementById('dash-card-linkedin');
+    if (dashLinkedinCard) {
+        dashLinkedinCard.addEventListener('click', openLinkedInModal);
+    }
+
+    const dashGithubCard = document.getElementById('dash-card-github');
+    if (dashGithubCard) {
+        dashGithubCard.addEventListener('click', openGitHubModal);
+    }
+
+    // Global Keyboard Handler (Escape key closes modals)
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modals = document.querySelectorAll('.modal-overlay:not(.hidden), .auth-modal-overlay:not(.hidden)');
+            modals.forEach(m => m.classList.add('hidden'));
+        }
+    });
+
     // Send Button click
     sendBtn.addEventListener('click', () => {
         const text = chatInput.value;
@@ -476,6 +537,16 @@ function renderChat(session) {
     // Update compact header
     chatTitle.textContent = session.role || 'Interview';
     difficultyBadge.textContent = session.difficulty || 'Adaptive';
+
+    const personalizedBadge = document.getElementById('personalized-badge');
+    if (personalizedBadge) {
+        const hasProfile = session.candidate_context && session.candidate_context.has_profile;
+        if (hasProfile) {
+            personalizedBadge.classList.remove('hidden');
+        } else {
+            personalizedBadge.classList.add('hidden');
+        }
+    }
 
     // Progress bar
     const totalQs = session.total_questions || 15;
@@ -793,6 +864,116 @@ function renderReport(session) {
         
         reportQuestionsBreakdown.appendChild(item);
     });
+
+    // Load Unified Candidate Insights Report
+    loadUnifiedCandidateReport(session.session_id);
+}
+
+async function loadUnifiedCandidateReport(sessionId) {
+    try {
+        const response = await authenticatedFetch(`/api/v1/reports/${sessionId}`);
+        if (!response.ok) return;
+        const report = await response.json();
+
+        // 1. Candidate Overview Card
+        const candOverviewCard = document.getElementById('report-candidate-overview');
+        if (candOverviewCard && report.overview) {
+            candOverviewCard.classList.remove('hidden');
+            document.getElementById('report-cand-name').textContent = report.overview.candidate_name || 'Candidate';
+            document.getElementById('report-cand-role').textContent = report.overview.target_role || 'Software Engineer';
+            document.getElementById('report-cand-date').textContent = report.overview.interview_date || '';
+
+            const candSourcesDiv = document.getElementById('report-cand-sources');
+            if (candSourcesDiv && report.overview.source_status) {
+                const st = report.overview.source_status;
+                candSourcesDiv.innerHTML = `
+                    <span class="source-status-badge ${st.resume === 'available' ? 'available' : ''}"><i class="fa-solid fa-file-pdf"></i> Resume ${st.resume === 'available' ? '✓' : '✗'}</span>
+                    <span class="source-status-badge ${st.linkedin === 'available' ? 'available' : ''}"><i class="fa-brands fa-linkedin"></i> LinkedIn ${st.linkedin === 'available' ? '✓' : '✗'}</span>
+                    <span class="source-status-badge ${st.github === 'available' ? 'available' : ''}"><i class="fa-brands fa-github"></i> GitHub ${st.github === 'available' ? '✓' : '✗'}</span>
+                `;
+            }
+        }
+
+        // 2. Metric Score Cards (Kept Strictly Separate!)
+        if (report.profile_evidence) {
+            const pe = report.profile_evidence;
+            document.getElementById('stat-resume-ats').textContent = pe.resume_ats_score ? `${pe.resume_ats_score}/100` : '—';
+            document.getElementById('stat-linkedin-score').textContent = pe.linkedin_score ? `${pe.linkedin_score}/100` : '—';
+            document.getElementById('stat-github-score').textContent = pe.github_score ? `${pe.github_score}/100` : '—';
+        }
+
+        // 3. Skill Validation Matrix Table
+        const matrixBody = document.getElementById('report-skill-matrix-body');
+        const sectionSkillMatrix = document.getElementById('section-skill-matrix');
+        if (matrixBody && report.skill_validation && report.skill_validation.length > 0) {
+            if (sectionSkillMatrix) sectionSkillMatrix.classList.remove('hidden');
+            matrixBody.innerHTML = '';
+            report.skill_validation.forEach(item => {
+                const tr = document.createElement('tr');
+                let statusClass = 'status-not-assessed';
+                if (item.status === 'Demonstrated') statusClass = 'status-demonstrated';
+                else if (item.status === 'Partially Demonstrated') statusClass = 'status-partially';
+
+                const sourcesHtml = item.profile_sources.map(src => `<span class="source-mini-tag">${src}</span>`).join(' ');
+                tr.innerHTML = `
+                    <td class="font-weight-600">${item.skill}</td>
+                    <td>${sourcesHtml || 'Profile Claim'}</td>
+                    <td class="text-sub">${item.interview_evidence}</td>
+                    <td><span class="matrix-status-pill ${statusClass}">${item.status}</span></td>
+                `;
+                matrixBody.appendChild(tr);
+            });
+        } else if (sectionSkillMatrix) {
+            sectionSkillMatrix.classList.add('hidden');
+        }
+
+        // 4. Project Validation List
+        const projectList = document.getElementById('report-project-matrix-list');
+        const sectionProjectMatrix = document.getElementById('section-project-matrix');
+        if (projectList && report.project_validation && report.project_validation.length > 0) {
+            if (sectionProjectMatrix) sectionProjectMatrix.classList.remove('hidden');
+            projectList.innerHTML = '';
+            report.project_validation.forEach(prj => {
+                const pcard = document.createElement('div');
+                pcard.className = 'timeline-item-card';
+                let statusClass = 'status-not-assessed';
+                if (prj.status === 'Demonstrated') statusClass = 'status-demonstrated';
+                else if (prj.status === 'Partially Demonstrated') statusClass = 'status-partially';
+
+                pcard.innerHTML = `
+                    <div class="timeline-item-header">
+                        <span class="timeline-item-title">${prj.project_title}</span>
+                        <span class="matrix-status-pill ${statusClass}">${prj.status}</span>
+                    </div>
+                    <p class="timeline-item-sub margin-top-4">${prj.interview_evidence}</p>
+                `;
+                projectList.appendChild(pcard);
+            });
+        } else if (sectionProjectMatrix) {
+            sectionProjectMatrix.classList.add('hidden');
+        }
+
+        // 5. Strengths & Gaps
+        const demStrengthsList = document.getElementById('report-demonstrated-strengths');
+        if (demStrengthsList && report.demonstrated_strengths) {
+            demStrengthsList.innerHTML = report.demonstrated_strengths.map(s => `<li><i class="fa-solid fa-circle-check icon-emerald"></i> ${s}</li>`).join('');
+        }
+
+        const devGapsList = document.getElementById('report-development-gaps');
+        if (devGapsList && report.development_gaps) {
+            devGapsList.innerHTML = report.development_gaps.map(g => `<li><i class="fa-solid fa-circle-exclamation icon-amber"></i> ${g}</li>`).join('');
+        }
+
+        // 6. Actionable Recommendations & Future Focus
+        const recList = document.getElementById('report-recommendations-list');
+        if (recList && report.recommendations) {
+            const items = [...report.recommendations, ...(report.future_interview_focus || [])];
+            recList.innerHTML = items.map(r => `<li><i class="fa-solid fa-arrow-right icon-emerald"></i> ${r}</li>`).join('');
+        }
+
+    } catch (err) {
+        console.error('Error fetching unified candidate report:', err);
+    }
 }
 
 function makeReportSectionsCollapsible(htmlContent) {
@@ -933,3 +1114,626 @@ function sanitizeFeedbackText(text) {
     }
     return lines[0] || '';
 }
+
+// ----------------------------------------
+// Auth & JWT Token Handlers
+// ----------------------------------------
+
+async function checkAuthSession() {
+    if (!authState.accessToken) {
+        showAuthModal(true);
+        return;
+    }
+    try {
+        const res = await authenticatedFetch('/api/v1/auth/me');
+        if (res.ok) {
+            const user = await res.json();
+            authState.currentUser = user;
+            authState.isAuthenticated = true;
+            updateUserUI(user);
+            showAuthModal(false);
+        } else {
+            showAuthModal(true);
+        }
+    } catch (e) {
+        console.error('Auth check error:', e);
+        showAuthModal(true);
+    }
+}
+
+function updateUserUI(user) {
+    if (userProfileCard && user) {
+        if (userDisplayName) userDisplayName.textContent = user.full_name || 'Candidate';
+        if (userDisplayEmail) userDisplayEmail.textContent = user.email || '';
+        userProfileCard.classList.remove('hidden');
+    } else if (userProfileCard) {
+        userProfileCard.classList.add('hidden');
+    }
+}
+
+function showAuthModal(show) {
+    if (authModalOverlay) {
+        if (show) {
+            authModalOverlay.classList.remove('hidden');
+        } else {
+            authModalOverlay.classList.add('hidden');
+        }
+    }
+}
+
+function setAuthTokens(access, refresh) {
+    authState.accessToken = access;
+    authState.refreshToken = refresh;
+    if (access) localStorage.setItem('saathi_access_token', access);
+    else localStorage.removeItem('saathi_access_token');
+    
+    if (refresh) localStorage.setItem('saathi_refresh_token', refresh);
+    else localStorage.removeItem('saathi_refresh_token');
+}
+
+function clearAuthTokens() {
+    authState.accessToken = null;
+    authState.refreshToken = null;
+    authState.currentUser = null;
+    authState.isAuthenticated = false;
+    localStorage.removeItem('saathi_access_token');
+    localStorage.removeItem('saathi_refresh_token');
+}
+
+async function authenticatedFetch(url, options = {}) {
+    options.headers = options.headers || {};
+    if (authState.accessToken) {
+        options.headers['Authorization'] = `Bearer ${authState.accessToken}`;
+    }
+    
+    let response = await fetch(url, options);
+    
+    // Auto refresh token if 401 response received
+    if (response.status === 401 && authState.refreshToken) {
+        const refreshSuccess = await performTokenRefresh();
+        if (refreshSuccess) {
+            options.headers['Authorization'] = `Bearer ${authState.accessToken}`;
+            response = await fetch(url, options);
+        } else {
+            logoutUser();
+        }
+    }
+    return response;
+}
+
+async function performTokenRefresh() {
+    if (!authState.refreshToken) return false;
+    try {
+        const res = await fetch('/api/v1/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: authState.refreshToken })
+        });
+        if (!res.ok) return false;
+        const tokens = await res.json();
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+        return true;
+    } catch (e) {
+        console.error('Token refresh error:', e);
+        return false;
+    }
+}
+
+async function handleLoginSubmit(e) {
+    e.preventDefault();
+    hideAuthError();
+    const email = document.getElementById('login-email-input').value.trim();
+    const password = document.getElementById('login-password-input').value;
+    
+    const submitBtn = document.getElementById('login-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Authenticating...';
+    
+    try {
+        const response = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Invalid email or password');
+        }
+        
+        const tokens = await response.json();
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+        
+        await checkAuthSession();
+    } catch (err) {
+        showAuthError(err.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>';
+    }
+}
+
+async function handleRegisterSubmit(e) {
+    e.preventDefault();
+    hideAuthError();
+    const fullName = document.getElementById('register-name-input').value.trim();
+    const email = document.getElementById('register-email-input').value.trim();
+    const password = document.getElementById('register-password-input').value;
+    
+    if (password.length < 8) {
+        showAuthError('Password must be at least 8 characters long.');
+        return;
+    }
+    
+    const submitBtn = document.getElementById('register-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Creating Account...';
+    
+    try {
+        const regResponse = await fetch('/api/v1/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ full_name: fullName, email, password })
+        });
+        
+        if (!regResponse.ok) {
+            const err = await regResponse.json();
+            throw new Error(err.detail || 'Registration failed');
+        }
+        
+        // Auto-login after registration
+        const loginResponse = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (!loginResponse.ok) throw new Error('Account created! Please sign in.');
+        
+        const tokens = await loginResponse.json();
+        setAuthTokens(tokens.access_token, tokens.refresh_token);
+        
+        await checkAuthSession();
+    } catch (err) {
+        showAuthError(err.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Create Account</span> <i class="fa-solid fa-user-plus"></i>';
+    }
+}
+
+function logoutUser() {
+    clearAuthTokens();
+    updateUserUI(null);
+    showAuthModal(true);
+}
+
+function showAuthError(msg) {
+    if (authErrorBanner) {
+        authErrorBanner.textContent = msg;
+        authErrorBanner.classList.remove('hidden');
+    }
+}
+
+function hideAuthError() {
+    if (authErrorBanner) {
+        authErrorBanner.textContent = '';
+        authErrorBanner.classList.add('hidden');
+    }
+}
+
+function setupAuthEventListeners() {
+    if (tabLoginBtn && tabRegisterBtn) {
+        tabLoginBtn.addEventListener('click', () => {
+            tabLoginBtn.classList.add('active');
+            tabRegisterBtn.classList.remove('active');
+            authLoginForm.classList.remove('hidden');
+            authRegisterForm.classList.add('hidden');
+            hideAuthError();
+        });
+        
+        tabRegisterBtn.addEventListener('click', () => {
+            tabRegisterBtn.classList.add('active');
+            tabLoginBtn.classList.remove('active');
+            authRegisterForm.classList.remove('hidden');
+            authLoginForm.classList.add('hidden');
+            hideAuthError();
+        });
+    }
+    
+    if (authLoginForm) {
+        authLoginForm.addEventListener('submit', handleLoginSubmit);
+    }
+    
+    if (authRegisterForm) {
+        authRegisterForm.addEventListener('submit', handleRegisterSubmit);
+    }
+    
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logoutUser);
+    }
+}
+
+/* ── MODAL OPENING HELPER FUNCTIONS ── */
+function openLinkedInModal() {
+    const modal = document.getElementById('linkedin-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        closeMobileDrawer();
+    }
+}
+
+function openGitHubModal() {
+    const modal = document.getElementById('github-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        closeMobileDrawer();
+    }
+}
+
+function openProfileModal() {
+    const modal = document.getElementById('profile-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        loadCandidateProfile();
+        closeMobileDrawer();
+    }
+}
+
+/* ── LINKEDIN INTEGRATION HANDLERS ── */
+function setupLinkedInEventListeners() {
+    const openBtn = document.getElementById('open-linkedin-modal');
+    const closeBtn = document.getElementById('close-linkedin-modal');
+    const modal = document.getElementById('linkedin-modal');
+    const form = document.getElementById('linkedin-form');
+    const urlInput = document.getElementById('linkedin-url-input');
+    const loadingState = document.getElementById('linkedin-loading');
+    const errorState = document.getElementById('linkedin-error');
+    const errorText = document.getElementById('linkedin-error-text');
+    const resultsContainer = document.getElementById('linkedin-results');
+
+    if (openBtn) {
+        openBtn.addEventListener('click', openLinkedInModal);
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const profileUrl = urlInput.value.trim();
+            if (!profileUrl) return;
+
+            // UI State: Analyzing
+            loadingState.classList.remove('hidden');
+            errorState.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+
+            try {
+                const response = await authenticatedFetch('/api/v1/linkedin/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profile_url: profileUrl })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Failed to analyze LinkedIn profile.');
+                }
+
+                const data = await response.json();
+
+                // UI State: Success
+                document.getElementById('li-overall-score').textContent = data.linkedin_score || 75;
+                document.getElementById('li-visibility-score').textContent = data.recruiter_visibility_score || 75;
+                document.getElementById('li-headline-review').textContent = data.headline_review || 'No review available.';
+                document.getElementById('li-improved-headline').textContent = data.improved_headline || 'N/A';
+                document.getElementById('li-about-review').textContent = data.about_review || 'No review available.';
+                document.getElementById('li-improved-about').textContent = data.improved_about || 'N/A';
+
+                const suggestionsList = document.getElementById('li-suggestions-list');
+                suggestionsList.innerHTML = '';
+                (data.optimization_suggestions || []).forEach(s => {
+                    const li = document.createElement('li');
+                    li.textContent = s;
+                    suggestionsList.appendChild(li);
+                });
+
+                const keywordsBox = document.getElementById('li-keywords-tags');
+                keywordsBox.innerHTML = '';
+                (data.missing_keywords || []).forEach(kw => {
+                    const tag = document.createElement('span');
+                    tag.className = 'keyword-tag';
+                    tag.textContent = kw;
+                    keywordsBox.appendChild(tag);
+                });
+
+                resultsContainer.classList.remove('hidden');
+            } catch (err) {
+                // UI State: Error
+                errorText.textContent = err.message;
+                errorState.classList.remove('hidden');
+            } finally {
+                loadingState.classList.add('hidden');
+            }
+        });
+    }
+}
+
+/* ── GITHUB INTEGRATION HANDLERS ── */
+function setupGitHubEventListeners() {
+    const openBtn = document.getElementById('open-github-modal');
+    const closeBtn = document.getElementById('close-github-modal');
+    const modal = document.getElementById('github-modal');
+    const form = document.getElementById('github-form');
+    const usernameInput = document.getElementById('github-username-input');
+    const loadingState = document.getElementById('github-loading');
+    const errorState = document.getElementById('github-error');
+    const errorText = document.getElementById('github-error-text');
+    const resultsContainer = document.getElementById('github-results');
+
+    if (openBtn) {
+        openBtn.addEventListener('click', openGitHubModal);
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inputVal = usernameInput.value.trim();
+            if (!inputVal) return;
+
+            // UI State: Analyzing
+            loadingState.classList.remove('hidden');
+            errorState.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+
+            try {
+                const response = await authenticatedFetch('/api/v1/github/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: inputVal })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Failed to analyze GitHub profile.');
+                }
+
+                const data = await response.json();
+
+                // UI State: Success
+                document.getElementById('gh-overall-score').textContent = data.github_score || 75;
+                document.getElementById('gh-depth-score').textContent = data.technical_depth_score || 70;
+                document.getElementById('gh-readiness-score').textContent = data.hiring_readiness_score || 70;
+
+                // Languages tags
+                const langBox = document.getElementById('gh-languages-tags');
+                langBox.innerHTML = '';
+                (data.languages_extracted || []).forEach(lang => {
+                    const tag = document.createElement('span');
+                    tag.className = 'keyword-tag';
+                    tag.textContent = lang;
+                    langBox.appendChild(tag);
+                });
+
+                // Repo highlights
+                document.getElementById('gh-best-documented-repo').textContent = data.best_documented_repo || 'N/A';
+                document.getElementById('gh-most-active-repo').textContent = data.most_active_repo || 'N/A';
+                document.getElementById('gh-largest-project').textContent = data.largest_project || 'N/A';
+
+                // README evaluation
+                document.getElementById('gh-readme-eval').textContent = data.readme_evaluations || 'No critique available.';
+
+                // Portfolio recommendations
+                const recsList = document.getElementById('gh-recommendations-list');
+                recsList.innerHTML = '';
+                (data.missing_project_recommendations || []).forEach(r => {
+                    const li = document.createElement('li');
+                    li.textContent = r;
+                    recsList.appendChild(li);
+                });
+
+                // Improvement suggestions
+                const suggsList = document.getElementById('gh-suggestions-list');
+                suggsList.innerHTML = '';
+                (data.improvement_suggestions || []).forEach(s => {
+                    const li = document.createElement('li');
+                    li.textContent = s;
+                    suggsList.appendChild(li);
+                });
+
+                resultsContainer.classList.remove('hidden');
+            } catch (err) {
+                // UI State: Error
+                errorText.textContent = err.message;
+                errorState.classList.remove('hidden');
+            } finally {
+                loadingState.classList.add('hidden');
+            }
+        });
+    }
+}
+
+/* ── UNIFIED CANDIDATE PROFILE HANDLERS ── */
+function setupProfileEventListeners() {
+    const openBtn = document.getElementById('open-profile-modal');
+    const closeBtn = document.getElementById('close-profile-modal');
+    const modal = document.getElementById('profile-modal');
+
+    if (openBtn) {
+        openBtn.addEventListener('click', openProfileModal);
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+    }
+
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+}
+
+async function loadCandidateProfile() {
+    const loadingState = document.getElementById('profile-loading');
+    const contentBox = document.getElementById('profile-content');
+    if (!loadingState || !contentBox) return;
+
+    loadingState.classList.remove('hidden');
+    contentBox.classList.add('hidden');
+
+    try {
+        const response = await authenticatedFetch('/api/v1/profile');
+        if (!response.ok) {
+            throw new Error('Failed to load candidate profile.');
+        }
+
+        const data = await response.json();
+
+        // Update Source Status Badges
+        const srcStatus = data.source_status || {};
+        updateSourceBadge('resume', srcStatus.resume || 'not_provided');
+        updateSourceBadge('linkedin', srcStatus.linkedin || 'not_provided');
+        updateSourceBadge('github', srcStatus.github || 'not_provided');
+
+        // Skills with source icons
+        const skillsBox = document.getElementById('profile-skills-tags');
+        skillsBox.innerHTML = '';
+        (data.unified_skills || []).forEach(item => {
+            const tag = document.createElement('div');
+            tag.className = 'skill-provenance-tag';
+
+            let iconsHtml = '';
+            (item.sources || []).forEach(src => {
+                if (src === 'resume') iconsHtml += '<i class="fa-solid fa-file-pdf" title="Resume Evidence"></i>';
+                if (src === 'linkedin') iconsHtml += '<i class="fa-brands fa-linkedin" title="LinkedIn Evidence"></i>';
+                if (src === 'github') iconsHtml += '<i class="fa-brands fa-github" title="GitHub Evidence"></i>';
+            });
+
+            tag.innerHTML = `<span>${item.skill}</span><span class="provenance-icons">${iconsHtml}</span>`;
+            skillsBox.appendChild(tag);
+        });
+
+        // Consistency Report
+        const report = data.consistency_report || {};
+        document.getElementById('profile-consistency-score').textContent = report.consistency_score || 80;
+
+        const claimsList = document.getElementById('profile-consistent-claims');
+        claimsList.innerHTML = '';
+        (report.consistent_claims || []).forEach(c => {
+            const li = document.createElement('li');
+            li.textContent = c;
+            claimsList.appendChild(li);
+        });
+
+        const missingList = document.getElementById('profile-missing-evidence');
+        missingList.innerHTML = '';
+        (report.missing_evidence || []).forEach(m => {
+            const li = document.createElement('li');
+            li.textContent = m;
+            missingList.appendChild(li);
+        });
+
+        // Experience Timeline
+        const expBox = document.getElementById('profile-experience-list');
+        expBox.innerHTML = '';
+        (data.unified_experience || []).forEach(exp => {
+            const card = document.createElement('div');
+            card.className = 'timeline-item-card';
+            card.innerHTML = `
+                <div class="timeline-item-header">
+                    <span class="timeline-item-title">${exp.role} @ ${exp.company}</span>
+                    <span class="keyword-tag">${exp.dates || 'N/A'}</span>
+                </div>
+                ${exp.description ? `<p class="timeline-item-sub">${exp.description}</p>` : ''}
+            `;
+            expBox.appendChild(card);
+        });
+
+        // Projects
+        const projBox = document.getElementById('profile-projects-list');
+        projBox.innerHTML = '';
+        (data.unified_projects || []).forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'timeline-item-card';
+            card.innerHTML = `
+                <div class="timeline-item-header">
+                    <span class="timeline-item-title">${p.title}</span>
+                    <span class="keyword-tag">${(p.sources || []).join(', ')}</span>
+                </div>
+                ${p.description ? `<p class="timeline-item-sub">${p.description}</p>` : ''}
+            `;
+            projBox.appendChild(card);
+        });
+
+        // Strengths & Recommendations
+        const strengthsList = document.getElementById('profile-strengths-list');
+        strengthsList.innerHTML = '';
+        (data.strengths || []).forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = s;
+            strengthsList.appendChild(li);
+        });
+
+        const recsList = document.getElementById('profile-recommendations-list');
+        recsList.innerHTML = '';
+        (data.recommendations || []).forEach(r => {
+            const li = document.createElement('li');
+            li.textContent = r;
+            recsList.appendChild(li);
+        });
+
+        contentBox.classList.remove('hidden');
+    } catch (err) {
+        console.error('Candidate Profile Error:', err);
+    } finally {
+        loadingState.classList.add('hidden');
+    }
+}
+
+function updateSourceBadge(sourceKey, status) {
+    const badge = document.getElementById(`status-badge-${sourceKey}`);
+    const textSpan = document.getElementById(`status-text-${sourceKey}`);
+    if (!badge || !textSpan) return;
+
+    textSpan.textContent = status === 'available' ? 'Available ✓' : status.replace('_', ' ');
+    if (status === 'available') {
+        badge.classList.add('available');
+    } else {
+        badge.classList.remove('available');
+    }
+}
+
+
+

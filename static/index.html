@@ -43,23 +43,15 @@
           <span class="brand-sub">AI Interview Coach</span>
         </div>
       </div>
-      <button id="new-interview-btn" class="btn-new">
+      <button id="new-interview-btn" class="btn-new" title="Dashboard / New Interview">
         <i class="fa-solid fa-plus"></i>
         <span>New</span>
       </button>
     </div>
 
-    <!-- Recents -->
-    <div class="sidebar-section">
-      <p class="sidebar-label">Recent</p>
-      <div id="recents-list" class="recents-list">
-        <div class="loading-placeholder">Loading...</div>
-      </div>
-    </div>
-
-    <!-- Setup -->
+    <!-- 1. INTERVIEW SETUP SECTION -->
     <div class="sidebar-section sidebar-setup">
-      <p class="sidebar-label">Setup</p>
+      <p class="sidebar-label"><i class="fa-solid fa-play icon-emerald"></i> Interview Hub</p>
       <form id="settings-form" class="setup-form">
 
         <div class="select-wrap">
@@ -90,60 +82,133 @@
       </form>
     </div>
 
+    <!-- 2. CANDIDATE INTELLIGENCE TOOLS -->
+    <div class="sidebar-section">
+      <p class="sidebar-label"><i class="fa-solid fa-id-card icon-emerald"></i> Candidate Intelligence</p>
+      <button id="open-profile-modal" type="button" class="btn-sidebar-tool btn-tool-unified">
+        <i class="fa-solid fa-id-card icon-emerald"></i>
+        <span>Candidate Profile</span>
+      </button>
+      <div class="sidebar-tool-row">
+        <button id="open-linkedin-modal" type="button" class="btn-sidebar-tool">
+          <i class="fa-brands fa-linkedin icon-linkedin"></i>
+          <span>LinkedIn</span>
+        </button>
+        <button id="open-github-modal" type="button" class="btn-sidebar-tool">
+          <i class="fa-brands fa-github icon-github"></i>
+          <span>GitHub</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. RECENT INTERVIEWS HISTORY -->
+    <div class="sidebar-section sidebar-recents-section">
+      <p class="sidebar-label"><i class="fa-solid fa-clock-rotate-left"></i> Recent Interviews</p>
+      <div id="recents-list" class="recents-list">
+        <div class="loading-placeholder">Loading interviews...</div>
+      </div>
+    </div>
+
+    <!-- 4. AUTHENTICATED USER CARD -->
+    <div id="user-profile-card" class="sidebar-user-card hidden">
+      <div class="user-avatar-circle"><i class="fa-solid fa-user"></i></div>
+      <div class="user-details">
+        <span id="user-display-name" class="user-name-text">Candidate</span>
+        <span id="user-display-email" class="user-email-text">user@example.com</span>
+      </div>
+      <button id="logout-btn" class="btn-logout" title="Sign Out">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+
   </aside>
 
   <!-- ═══ WORKSPACE ═══ -->
   <main class="workspace">
 
-    <!-- ── STATE 1: BEFORE INTERVIEW ── -->
+    <!-- ── STATE 1: DASHBOARD / BEFORE INTERVIEW ── -->
     <div id="view-empty" class="view-state active">
 
-      <!-- Same slim bar as chat — consistent header height -->
       <div class="context-bar">
         <div class="context-left">
           <div class="ai-avatar"><img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img"></div>
           <div>
-            <span class="context-title">Saathi</span>
-            <span class="context-sub">Your AI Interview Coach</span>
+            <span class="context-title">Saathi Dashboard</span>
+            <span class="context-sub">AI Interview Coach & Candidate Intelligence Hub</span>
           </div>
         </div>
       </div>
 
-      <!-- Messages area — same layout as chat, content flows from top -->
-      <div class="messages-area">
+      <div class="messages-area dashboard-container">
 
-        <!-- AI intro message — styled exactly like a chat message -->
-        <div class="chat-message assistant">
-          <div class="msg-avatar"><img src="/static/saathi_logo.svg" alt="Saathi" class="avatar-logo-img"></div>
-          <div class="msg-body">
-            <div class="msg-sender">Saathi</div>
-            <div class="msg-text">
-              <p class="msg-heading">Ready to begin?</p>
-              <p>Hi, I'm Saathi. I'll tailor this interview to your selected role and adjust the difficulty based on your responses. Once we're done, you'll receive structured feedback and a performance report.</p>
-              <div class="msg-meta-chips">
-                <span class="meta-chip"><i class="fa-solid fa-briefcase"></i> Role-tailored</span>
-                <span class="meta-chip"><i class="fa-solid fa-sliders"></i> Adaptive</span>
-                <span class="meta-chip"><i class="fa-solid fa-chart-column"></i> Scored report</span>
-              </div>
+        <!-- Welcome Banner Card -->
+        <div class="dashboard-hero-card">
+          <div class="hero-text-block">
+            <h2 class="hero-title"><i class="fa-solid fa-sparkles icon-emerald"></i> Welcome to Saathi</h2>
+            <p class="hero-desc">Your intelligent interview coach. Saathi synthesizes your <strong>Resume</strong>, <strong>LinkedIn</strong>, and <strong>GitHub</strong> profiles to deliver role-relevant adaptive mock interviews with technical feedback.</p>
+            <div class="hero-chips-flex">
+              <span class="meta-chip"><i class="fa-solid fa-shield-halved"></i> Verified Candidate Profile</span>
+              <span class="meta-chip"><i class="fa-solid fa-sliders"></i> Adaptive Difficulty</span>
+              <span class="meta-chip"><i class="fa-solid fa-chart-column"></i> Structured Scored Reports</span>
             </div>
           </div>
         </div>
 
-        <!-- Hint row -->
-        <div class="pre-hint">
-          <i class="fa-solid fa-arrow-left"></i>
-          Select a position and hit <strong>Start Interview</strong> to begin
+        <!-- Candidate Intelligence Hub Cards Grid -->
+        <div class="dashboard-section-head">
+          <h3><i class="fa-solid fa-layer-group icon-emerald"></i> Candidate Intelligence Hub</h3>
+          <p>Audit individual channels or view your synthesized Unified Candidate Profile.</p>
+        </div>
+
+        <div class="dashboard-hub-grid">
+
+          <div class="hub-card hub-card-unified" id="dash-card-profile">
+            <div class="hub-card-header">
+              <div class="hub-card-icon icon-bg-emerald"><i class="fa-solid fa-id-card"></i></div>
+              <span class="hub-status-pill status-ready" id="dash-badge-profile">Synthesis Ready</span>
+            </div>
+            <h4 class="hub-card-title">Unified Candidate Profile</h4>
+            <p class="hub-card-desc">Cross-channel skill normalization, multi-source evidence provenance, and consistency audit.</p>
+            <div class="hub-card-action">
+              <span>View Profile</span> <i class="fa-solid fa-arrow-right"></i>
+            </div>
+          </div>
+
+          <div class="hub-card" id="dash-card-linkedin">
+            <div class="hub-card-header">
+              <div class="hub-card-icon icon-bg-linkedin"><i class="fa-brands fa-linkedin"></i></div>
+              <span class="hub-status-pill" id="dash-badge-linkedin">Audit Profile</span>
+            </div>
+            <h4 class="hub-card-title">LinkedIn Profile Audit</h4>
+            <p class="hub-card-desc">Recruiter visibility scoring, headline & about optimization, missing keyword detection.</p>
+            <div class="hub-card-action">
+              <span>Audit LinkedIn</span> <i class="fa-solid fa-arrow-right"></i>
+            </div>
+          </div>
+
+          <div class="hub-card" id="dash-card-github">
+            <div class="hub-card-header">
+              <div class="hub-card-icon icon-bg-github"><i class="fa-brands fa-github"></i></div>
+              <span class="hub-status-pill" id="dash-badge-github">Audit Repos</span>
+            </div>
+            <h4 class="hub-card-title">GitHub Repository Audit</h4>
+            <p class="hub-card-desc">Technical depth evaluation, codebase maturity, README documentation audit & suggestions.</p>
+            <div class="hub-card-action">
+              <span>Audit GitHub</span> <i class="fa-solid fa-arrow-right"></i>
+            </div>
+          </div>
+
         </div>
 
       </div>
 
-      <!-- Disabled composer — same structure, visually clear but inert -->
+      <!-- Disabled composer with clear prompt -->
       <div class="composer-area">
         <div class="composer composer-idle">
-          <textarea placeholder="Select a role to start your interview with Saathi..." disabled rows="1"></textarea>
+          <textarea placeholder="Select a position in the sidebar to start your interview..." disabled rows="1"></textarea>
           <button class="composer-send" disabled><i class="fa-solid fa-arrow-up"></i></button>
         </div>
-        <p class="composer-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</p>
+        <p class="composer-hint">Select a target role in the sidebar &nbsp;·&nbsp; Click Start Interview to begin</p>
       </div>
 
     </div>
@@ -163,6 +228,9 @@
               <span id="chat-title" class="role-text">Select Position</span>
               <span class="dot-separator">•</span>
               <span id="difficulty-badge" class="difficulty-text">Adaptive</span>
+              <span id="personalized-badge" class="personalized-pill hidden">
+                <i class="fa-solid fa-sparkles"></i> Personalized from Profile
+              </span>
             </div>
           </div>
         </div>
@@ -218,19 +286,53 @@
 
       <div class="report-scroll">
 
+        <!-- Candidate Overview & Profile Source Coverage -->
+        <div id="report-candidate-overview" class="report-overview-card hidden">
+          <div class="overview-grid">
+            <div>
+              <span class="overview-label">Candidate</span>
+              <h3 id="report-cand-name" class="overview-title">Candidate</h3>
+            </div>
+            <div>
+              <span class="overview-label">Target Role</span>
+              <h3 id="report-cand-role" class="overview-title">Backend Developer</h3>
+            </div>
+            <div>
+              <span class="overview-label">Date</span>
+              <h3 id="report-cand-date" class="overview-title">2026-09-01</h3>
+            </div>
+          </div>
+          <div id="report-cand-sources" class="profile-status-bar margin-top-12"></div>
+        </div>
+
+        <!-- Metric Cards Grid (Separate metrics: Resume ATS, LinkedIn, GitHub, Interview) -->
         <div class="report-stats">
           <div class="rstat">
-            <div class="rstat-icon"><i class="fa-solid fa-arrows-spin"></i></div>
+            <div class="rstat-icon"><i class="fa-solid fa-star icon-emerald"></i></div>
             <div>
-              <div class="rstat-val" id="stat-exchanges">0</div>
-              <div class="rstat-label">Exchanges</div>
+              <div class="rstat-val" id="stat-avg-score">—</div>
+              <div class="rstat-label">Interview Score</div>
             </div>
           </div>
           <div class="rstat">
-            <div class="rstat-icon"><i class="fa-solid fa-star"></i></div>
+            <div class="rstat-icon"><i class="fa-solid fa-file-pdf icon-emerald"></i></div>
             <div>
-              <div class="rstat-val" id="stat-avg-score">—</div>
-              <div class="rstat-label">Avg Score</div>
+              <div class="rstat-val" id="stat-resume-ats">—</div>
+              <div class="rstat-label">Resume ATS</div>
+            </div>
+          </div>
+          <div class="rstat">
+            <div class="rstat-icon"><i class="fa-brands fa-linkedin icon-linkedin"></i></div>
+            <div>
+              <div class="rstat-val" id="stat-linkedin-score">—</div>
+              <div class="rstat-label">LinkedIn Score</div>
+            </div>
+          </div>
+          <div class="rstat">
+            <div class="rstat-icon"><i class="fa-brands fa-github icon-github"></i></div>
+            <div>
+              <div class="rstat-val" id="stat-github-score">—</div>
+              <div class="rstat-label">GitHub Score</div>
             </div>
           </div>
           <div class="rstat decision-card" id="hiring-card">
@@ -247,14 +349,53 @@
           <p id="report-verdict-reasoning" class="rsection-body">—</p>
         </div>
 
-        <div class="report-section-container-flat">
-          <div class="rsection-label"><i class="fa-solid fa-file-invoice"></i> Performance Report</div>
-          <div id="report-summary-markdown"></div>
+        <!-- ── UNIFIED CANDIDATE INSIGHTS: SKILL VALIDATION MATRIX ── -->
+        <div class="report-section" id="section-skill-matrix">
+          <div class="rsection-label"><i class="fa-solid fa-table-list icon-emerald"></i> Skill Validation Matrix</div>
+          <p class="section-sub-desc">Comparison of candidate profile claims against live interview demonstration.</p>
+          <div class="table-responsive">
+            <table class="skill-matrix-table">
+              <thead>
+                <tr>
+                  <th>Skill</th>
+                  <th>Profile Evidence</th>
+                  <th>Interview Evaluation</th>
+                  <th>Validation Status</th>
+                </tr>
+              </thead>
+              <tbody id="report-skill-matrix-body"></tbody>
+            </table>
+          </div>
         </div>
 
+        <!-- ── UNIFIED CANDIDATE INSIGHTS: PROJECT VALIDATION MATRIX ── -->
+        <div class="report-section" id="section-project-matrix">
+          <div class="rsection-label"><i class="fa-solid fa-diagram-project icon-emerald"></i> Portfolio Project Validation</div>
+          <div id="report-project-matrix-list" class="projects-provenance-box"></div>
+        </div>
+
+        <!-- ── STRENGTHS & DEVELOPMENT GAPS ── -->
+        <div class="report-section-grid-2">
+          <div class="report-section">
+            <div class="rsection-label"><i class="fa-solid fa-bolt icon-emerald"></i> Demonstrated Strengths</div>
+            <ul id="report-demonstrated-strengths" class="suggestions-list-box"></ul>
+          </div>
+          <div class="report-section">
+            <div class="rsection-label"><i class="fa-solid fa-compass icon-amber"></i> Development Areas</div>
+            <ul id="report-development-gaps" class="suggestions-list-box"></ul>
+          </div>
+        </div>
+
+        <!-- ── ACTIONABLE RECOMMENDATIONS & FUTURE INTERVIEW FOCUS ── -->
         <div class="report-section">
-          <div class="rsection-label"><i class="fa-solid fa-list-check"></i> Answer Breakdown</div>
-          <div id="report-questions-breakdown" class="breakdown-list"></div>
+          <div class="rsection-label"><i class="fa-solid fa-lightbulb icon-emerald"></i> Actionable Recommendations</div>
+          <ul id="report-recommendations-list" class="suggestions-list-box"></ul>
+        </div>
+
+        <div class="report-section-container-flat">
+          <div class="rsection-label"><i class="fa-solid fa-file-invoice"></i> Detailed Question Breakdown & Feedback</div>
+          <div id="report-summary-markdown"></div>
+          <div id="report-questions-breakdown" class="breakdown-list margin-top-16"></div>
         </div>
 
       </div>
@@ -262,6 +403,315 @@
 
   </main>
 </div>
+
+<!-- ═══ AUTHENTICATION MODAL ═══ -->
+<div id="auth-modal-overlay" class="auth-modal-overlay hidden">
+  <div class="auth-card">
+    <div class="auth-header">
+      <img src="/static/saathi_logo.svg" alt="Saathi Logo" class="auth-brand-logo">
+      <h2 class="auth-title">Welcome to Saathi</h2>
+      <p class="auth-subtitle">AI Interview Coach Platform</p>
+    </div>
+
+    <!-- Auth Mode Selector Tabs -->
+    <div class="auth-tabs">
+      <button id="tab-login-btn" class="auth-tab active" type="button">Sign In</button>
+      <button id="tab-register-btn" class="auth-tab" type="button">Create Account</button>
+    </div>
+
+    <!-- Error / Notice Banner -->
+    <div id="auth-error-banner" class="auth-error-banner hidden"></div>
+
+    <!-- Login Form -->
+    <form id="auth-login-form" class="auth-form">
+      <div class="auth-field">
+        <label for="login-email-input"><i class="fa-solid fa-envelope"></i> Email Address</label>
+        <input type="email" id="login-email-input" placeholder="candidate@domain.com" required autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="login-password-input"><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="login-password-input" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" id="login-submit-btn" class="btn-auth-action">
+        <span>Sign In</span> <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </form>
+
+    <!-- Register Form -->
+    <form id="auth-register-form" class="auth-form hidden">
+      <div class="auth-field">
+        <label for="register-name-input"><i class="fa-solid fa-user"></i> Full Name</label>
+        <input type="text" id="register-name-input" placeholder="Alex Morgan" required minlength="2" maxlength="100" autocomplete="name">
+      </div>
+      <div class="auth-field">
+        <label for="register-email-input"><i class="fa-solid fa-envelope"></i> Email Address</label>
+        <input type="email" id="register-email-input" placeholder="candidate@domain.com" required autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="register-password-input"><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="register-password-input" placeholder="8–100 characters" required minlength="8" maxlength="100" autocomplete="new-password">
+      </div>
+      <button type="submit" id="register-submit-btn" class="btn-auth-action">
+        <span>Create Account</span> <i class="fa-solid fa-user-plus"></i>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ LINKEDIN ANALYSIS MODAL ═══ -->
+<div id="linkedin-modal" class="modal-overlay hidden">
+  <div class="modal-card linkedin-modal-card">
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <div class="linkedin-logo-badge"><i class="fa-brands fa-linkedin"></i></div>
+        <div>
+          <h3>LinkedIn Profile Audit</h3>
+          <p class="modal-sub">Recruiter visibility & headline optimization</p>
+        </div>
+      </div>
+      <button id="close-linkedin-modal" type="button" class="btn-icon-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="modal-body">
+      <form id="linkedin-form" class="linkedin-input-form">
+        <div class="input-group">
+          <label for="linkedin-url-input"><i class="fa-solid fa-link"></i> LinkedIn Profile URL</label>
+          <div class="url-input-wrap">
+            <input type="url" id="linkedin-url-input" placeholder="https://www.linkedin.com/in/username" required>
+            <button type="submit" id="analyze-linkedin-btn" class="btn-action-emerald">
+              <i class="fa-solid fa-magnifying-glass"></i> Audit Profile
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="linkedin-loading" class="linkedin-state-loading hidden">
+        <div class="spinner-emerald"></div>
+        <p>Crawling profile & calculating visibility metrics...</p>
+      </div>
+
+      <div id="linkedin-error" class="linkedin-state-error hidden">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="linkedin-error-text">Failed to analyze profile.</span>
+      </div>
+
+      <div id="linkedin-results" class="linkedin-results-container hidden">
+        <div class="score-summary-grid">
+          <div class="score-card-primary">
+            <span class="score-number" id="li-overall-score">0</span>
+            <span class="score-label">LinkedIn Score</span>
+          </div>
+          <div class="score-card-primary">
+            <span class="score-number" id="li-visibility-score">0</span>
+            <span class="score-label">Recruiter Visibility</span>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-heading"></i> Headline Review</h4>
+          <p id="li-headline-review" class="review-text-box"></p>
+          <div class="improved-box">
+            <strong class="improved-title"><i class="fa-solid fa-sparkles"></i> Optimized Headline Suggestion:</strong>
+            <div id="li-improved-headline" class="improved-content"></div>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-user-pen"></i> About Section Review</h4>
+          <p id="li-about-review" class="review-text-box"></p>
+          <div class="improved-box">
+            <strong class="improved-title"><i class="fa-solid fa-sparkles"></i> Optimized Summary Suggestion:</strong>
+            <div id="li-improved-about" class="improved-content"></div>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-lightbulb"></i> Optimization Recommendations</h4>
+          <ul id="li-suggestions-list" class="suggestions-list-box"></ul>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-key"></i> Missing Keywords</h4>
+          <div id="li-keywords-tags" class="keywords-tags-flex"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GITHUB ANALYSIS MODAL ═══ -->
+<div id="github-modal" class="modal-overlay hidden">
+  <div class="modal-card github-modal-card">
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <div class="github-logo-badge"><i class="fa-brands fa-github"></i></div>
+        <div>
+          <h3>GitHub Profile & Code Audit</h3>
+          <p class="modal-sub">Repository quality & technical depth analysis</p>
+        </div>
+      </div>
+      <button id="close-github-modal" type="button" class="btn-icon-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="modal-body">
+      <form id="github-form" class="github-input-form">
+        <div class="input-group">
+          <label for="github-username-input"><i class="fa-solid fa-code-branch"></i> GitHub Username or Profile URL</label>
+          <div class="url-input-wrap">
+            <input type="text" id="github-username-input" placeholder="octocat or https://github.com/octocat" required>
+            <button type="submit" id="analyze-github-btn" class="btn-action-emerald">
+              <i class="fa-solid fa-magnifying-glass"></i> Audit Repos
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="github-loading" class="github-state-loading hidden">
+        <div class="spinner-emerald"></div>
+        <p>Fetching repositories & evaluating codebase maturity...</p>
+      </div>
+
+      <div id="github-error" class="github-state-error hidden">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="github-error-text">Failed to analyze GitHub profile.</span>
+      </div>
+
+      <div id="github-results" class="github-results-container hidden">
+        <div class="score-summary-grid score-grid-triple">
+          <div class="score-card-primary">
+            <span class="score-number" id="gh-overall-score">0</span>
+            <span class="score-label">GitHub Score</span>
+          </div>
+          <div class="score-card-primary">
+            <span class="score-number" id="gh-depth-score">0</span>
+            <span class="score-label">Technical Depth</span>
+          </div>
+          <div class="score-card-primary">
+            <span class="score-number" id="gh-readiness-score">0</span>
+            <span class="score-label">Hiring Readiness</span>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-code"></i> Core Languages Detected</h4>
+          <div id="gh-languages-tags" class="keywords-tags-flex"></div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-trophy"></i> Repository Audit Highlights</h4>
+          <div class="repo-highlights-grid">
+            <div class="repo-highlight-item">
+              <span class="repo-highlight-title"><i class="fa-solid fa-book"></i> Best Documented:</span>
+              <span id="gh-best-documented-repo" class="repo-highlight-val">N/A</span>
+            </div>
+            <div class="repo-highlight-item">
+              <span class="repo-highlight-title"><i class="fa-solid fa-fire"></i> Most Active:</span>
+              <span id="gh-most-active-repo" class="repo-highlight-val">N/A</span>
+            </div>
+            <div class="repo-highlight-item">
+              <span class="repo-highlight-title"><i class="fa-solid fa-star"></i> Largest Project:</span>
+              <span id="gh-largest-project" class="repo-highlight-val">N/A</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-file-code"></i> Documentation & README Evaluation</h4>
+          <p id="gh-readme-eval" class="review-text-box"></p>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-folder-plus"></i> Recommended Portfolio Projects</h4>
+          <ul id="gh-recommendations-list" class="suggestions-list-box"></ul>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-wrench"></i> Improvement Suggestions</h4>
+          <ul id="gh-suggestions-list" class="suggestions-list-box"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ UNIFIED CANDIDATE PROFILE MODAL ═══ -->
+<div id="profile-modal" class="modal-overlay hidden">
+  <div class="modal-card profile-modal-card">
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <div class="profile-logo-badge"><i class="fa-solid fa-user-astronaut"></i></div>
+        <div>
+          <h3 id="profile-candidate-name">Unified Candidate Profile</h3>
+          <p class="modal-sub" id="profile-candidate-sub">Multi-channel credential verification & source synthesis</p>
+        </div>
+      </div>
+      <button id="close-profile-modal" type="button" class="btn-icon-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="modal-body">
+      <div class="profile-status-bar">
+        <div class="source-status-badge" id="status-badge-resume">
+          <i class="fa-solid fa-file-pdf"></i> Resume: <span id="status-text-resume">Not Provided</span>
+        </div>
+        <div class="source-status-badge" id="status-badge-linkedin">
+          <i class="fa-brands fa-linkedin"></i> LinkedIn: <span id="status-text-linkedin">Not Provided</span>
+        </div>
+        <div class="source-status-badge" id="status-badge-github">
+          <i class="fa-brands fa-github"></i> GitHub: <span id="status-text-github">Not Provided</span>
+        </div>
+      </div>
+
+      <div id="profile-loading" class="profile-state-loading hidden">
+        <div class="spinner-emerald"></div>
+        <p>Synthesizing candidate profile across active channels...</p>
+      </div>
+
+      <div id="profile-content" class="profile-content-container">
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-layer-group"></i> Verified Skills & Source Provenance</h4>
+          <div id="profile-skills-tags" class="skills-provenance-flex"></div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-shield-halved"></i> Cross-Source Consistency Audit</h4>
+          <div class="score-card-primary score-card-small">
+            <span class="score-number" id="profile-consistency-score">0</span>
+            <span class="score-label">Consistency Match Score</span>
+          </div>
+          <div class="audit-sub-block">
+            <strong class="audit-sub-title"><i class="fa-solid fa-circle-check icon-success"></i> Consistent Claims:</strong>
+            <ul id="profile-consistent-claims" class="suggestions-list-box"></ul>
+          </div>
+          <div class="audit-sub-block">
+            <strong class="audit-sub-title"><i class="fa-solid fa-circle-info icon-info"></i> Evidence Gaps / Missing Documentation:</strong>
+            <ul id="profile-missing-evidence" class="suggestions-list-box"></ul>
+          </div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-briefcase"></i> Work Experience Timeline</h4>
+          <div id="profile-experience-list" class="experience-timeline-box"></div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-diagram-project"></i> Portfolio Projects & Repositories</h4>
+          <div id="profile-projects-list" class="projects-provenance-box"></div>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-bolt"></i> Candidate Strengths</h4>
+          <ul id="profile-strengths-list" class="suggestions-list-box"></ul>
+        </div>
+
+        <div class="analysis-section-block">
+          <h4><i class="fa-solid fa-compass"></i> Synthesis Recommendations</h4>
+          <ul id="profile-recommendations-list" class="suggestions-list-box"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

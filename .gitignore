@@ -8,15 +8,18 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.pytest_cache/
 
 # Virtual environments
 venv/
 .venv/
 env/
 
-# Chat history (user data)
+# Chat history and temp uploads (user data)
 chat_history/
 interview_history/
+uploads/
+tmp/
 
 # Streamlit secrets
 .streamlit/secrets.toml
@@ -31,3 +34,4 @@ Thumbs.db
 
 # Logs
 *.log
+

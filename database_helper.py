@@ -1,5 +1,4 @@
 import os
-# pyrefly: ignore [missing-import]
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -28,12 +27,12 @@ class DatabaseManager:
             return False
         
         try:
-            # We use session_id as the primary identifier
             session_id = data.get("session_id")
             
-            # Prepare the record
+            # Prepare the record including nullable user_id column
             record = {
                 "session_id": session_id,
+                "user_id": data.get("user_id"),
                 "role": data.get("role"),
                 "difficulty": data.get("difficulty"),
                 "messages": data.get("messages"),
@@ -55,35 +54,44 @@ class DatabaseManager:
             print(f"Supabase Save Error: {e}")
             return False
 
-    def get_all_interviews(self):
-        """Fetches all interviews from Supabase."""
+    def get_all_interviews(self, user_id=None):
+        """Fetches interviews from Supabase, filtered by user_id if provided."""
         if not self.supabase:
             return []
         try:
-            response = self.supabase.table("interviews").select("*").order("created_at", desc=True).execute()
-            return response.data
+            query = self.supabase.table("interviews").select("*")
+            if user_id is not None:
+                query = query.eq("user_id", user_id)
+            response = query.order("created_at", desc=True).execute()
+            return response.data if response.data else []
         except Exception as e:
             print(f"Supabase Fetch Error: {e}")
             return []
 
-    def get_interview_by_id(self, session_id):
-        """Fetches a specific interview by session_id."""
+    def get_interview_by_id(self, session_id, user_id=None):
+        """Fetches a specific interview by session_id and optional user_id."""
         if not self.supabase:
             return None
         try:
-            response = self.supabase.table("interviews").select("*").eq("session_id", session_id).execute()
+            query = self.supabase.table("interviews").select("*").eq("session_id", session_id)
+            if user_id is not None:
+                query = query.eq("user_id", user_id)
+            response = query.execute()
             return response.data[0] if response.data else None
         except Exception as e:
             print(f"Supabase Single Fetch Error: {e}")
             return None
 
-    def delete_interview(self, session_id):
+    def delete_interview(self, session_id, user_id=None):
         """Deletes an interview session."""
         if not self.supabase:
             return False
         
         try:
-            self.supabase.table("interviews").delete().eq("session_id", session_id).execute()
+            query = self.supabase.table("interviews").delete().eq("session_id", session_id)
+            if user_id is not None:
+                query = query.eq("user_id", user_id)
+            query.execute()
             return True
         except Exception as e:
             print(f"Supabase Delete Error: {e}")
